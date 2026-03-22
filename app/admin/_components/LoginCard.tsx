@@ -12,7 +12,15 @@ export function LoginCard() {
     setLoading(true);
     setError(null);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      const idToken = await result.user.getIdToken();
+
+      await fetch("/api/admin/sync-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
       window.location.href = "/admin/dashboard";
     } catch (err) {
       setError("Não foi possível fazer login. Tente novamente.");

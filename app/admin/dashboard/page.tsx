@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import Image from "next/image";
 import { auth } from "@/lib/firebase";
 
 export default function DashboardPage() {
@@ -33,8 +34,17 @@ export default function DashboardPage() {
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
         <span className="font-bold text-gray-800">Ofersanja Admin</span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{user?.displayName}</span>
+        <div className="flex items-center gap-3">
+          {user?.photoURL && (
+            <Image
+              src={user.photoURL}
+              alt={user.displayName ?? "Avatar"}
+              width={32}
+              height={32}
+              className="rounded-full ring-2 ring-gray-200"
+            />
+          )}
+          <span className="text-sm text-gray-600 hidden sm:block">{user?.displayName}</span>
           <button
             onClick={() => signOut(auth).then(() => { window.location.href = "/admin"; })}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
