@@ -39,18 +39,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await adminDb
-    .collection("users")
-    .doc(uid)
-    .set(
-      {
-        name: name ?? null,
-        email: email ?? null,
-        photo: picture ?? null,
-        lastLoginAt: new Date(),
-      },
-      { merge: true }
-    );
+  // userDoc is guaranteed non-null here: null → empty roles → 403 returned above
+  await userDoc!.ref.update({
+    uid,
+    name: name ?? null,
+    email: email ?? null,
+    photo: picture ?? null,
+    lastLoginAt: new Date(),
+  });
 
   return Response.json({ success: true });
 }

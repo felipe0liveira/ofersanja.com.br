@@ -1,49 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import Image from "next/image";
 import { ShoppingBag } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { useAdminAuth } from "../_hooks/useAdminAuth";
+import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
 import type { Offer } from "@/lib/types/offer";
 
 type SortBy = "default" | "price_asc" | "price_desc" | "discount_desc" | "discount_asc";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [idToken, setIdToken] = useState<string>("");
-  const [checking, setChecking] = useState(true);
+  const { user, idToken, roles, checking } = useAdminAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const [showDispatched, setShowDispatched] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        window.location.href = "/admin";
-        return;
-      }
-      setUser(currentUser);
-      setChecking(false);
-
-      setLoadingOffers(true);
-      try {
-        const token = await currentUser.getIdToken();
-        setIdToken(token);
-        const res = await fetch("/api/admin/offers", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setOffers(data.offers ?? []);
-      } finally {
-        setLoadingOffers(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    if (!idToken) return;
+    setLoadingOffers(true);
+    fetch("/api/admin/offers", {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setOffers(d.offers ?? []))
+      .finally(() => setLoadingOffers(false));
+  }, [idToken]);
 
   const dispatchedCount = offers.filter((o) => o.dispatched_at).length;
 
@@ -75,27 +57,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-        <span className="font-bold text-gray-800">Ofersanja Admin</span>
-        <div className="flex items-center gap-3">
-          {user?.photoURL && (
-            <Image
-              src={user.photoURL}
-              alt={user.displayName ?? "Avatar"}
-              width={32}
-              height={32}
-              className="rounded-full ring-2 ring-gray-200"
-            />
-          )}
-          <span className="text-sm text-gray-600 hidden sm:block">{user?.displayName}</span>
-          <button
-            onClick={() => signOut(auth).then(() => { window.location.href = "/admin"; })}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Sair
-          </button>
-        </div>
-      </header>
+      <AdminHeader user={user!} roles={roles} />
 
       <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6 flex-wrap">
