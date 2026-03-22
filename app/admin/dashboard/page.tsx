@@ -10,6 +10,7 @@ import type { Offer } from "@/lib/types/offer";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [idToken, setIdToken] = useState<string>("");
   const [checking, setChecking] = useState(true);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
@@ -25,9 +26,10 @@ export default function DashboardPage() {
 
       setLoadingOffers(true);
       try {
-        const idToken = await currentUser.getIdToken();
+        const token = await currentUser.getIdToken();
+        setIdToken(token);
         const res = await fetch("/api/admin/offers", {
-          headers: { Authorization: `Bearer ${idToken}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         setOffers(data.offers ?? []);
@@ -94,7 +96,12 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {offers.map((offer) => (
-              <OfferCard key={offer.id} offer={offer} />
+              <OfferCard
+                key={offer.id}
+                offer={offer}
+                idToken={idToken}
+                onDispatched={(id) => setOffers((prev) => prev.filter((o) => o.id !== id))}
+              />
             ))}
           </div>
         )}

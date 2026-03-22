@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
     .orderBy("scrapped_at", "desc")
     .get();
 
-  const offers: Offer[] = snapshot.docs.map((doc) => {
+  const offers: Offer[] = snapshot.docs
+    .filter((doc) => !doc.data().dispatched_at)
+    .map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,

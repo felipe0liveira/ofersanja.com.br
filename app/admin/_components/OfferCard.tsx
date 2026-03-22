@@ -1,20 +1,86 @@
 import Image from "next/image";
 import { useState } from "react";
-import { Tag, Star, Clock, ExternalLink } from "lucide-react";
+import { Tag, Star, Clock, Copy, Check, Send } from "lucide-react";
 import type { Offer } from "@/lib/types/offer";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function OfferCard({ offer }: { offer: Offer }) {
-  const [imageLoaded, setImageLoaded] = useState(false);
+function buildWhatsAppText(offer: Offer): string {
+  const finalPrice = offer.coupon ? offer.price_with_coupon : offer.price;
+  const lines: string[] = [];
 
-  const discount = offer.old_price > 0
-    ? Math.round(((offer.old_price - offer.price) / offer.old_price) * 100)
-    : null;
+  lines.push(`🔥 *${offer.name}*`);
+  lines.push("");
+
+  if (offer.old_price > 0 && offer.old_price > offer.price) {
+    lines.push(`🤑 ~~De ${formatBRL(offer.old_price)}~~ Por *${formatBRL(offer.price)}*`);
+  }
+  // lines.push(`💰 Por apenas *${formatBRL(offer.price)}*`);
+
+  // if (offer.coupon) {
+  //   lines.push(`🏷️ Com cupom: *${formatBRL(finalPrice)}*`);
+  // }
+
+  // if (offer.rating) lines.push(`⭐ ${offer.rating}`);
+  // if (offer.seller) lines.push(`🏪 ${offer.seller}`);
+
+  // if (offer.time_limited) lines.push("⏳ Oferta por tempo limitado!");
+
+  lines.push("");
+  lines.push(`🔗 ${offer.link}`);
+
+  return lines.join("\n");
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.116.554 4.103 1.523 5.824L0 24l6.335-1.502A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.655-.502-5.19-1.38l-.372-.22-3.862.915.977-3.77-.242-.387A9.934 9.934 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+    </svg>
+  );
+}
+
+export function OfferCard({
+  offer,
+  idToken,
+  onDispatched,
+}: {
+  offer: Offer;
+  idToken: string;
+  onDispatched: (id: string) => void;
+}) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [dispatchStep, setDispatchStep] = useState<"idle" | "confirm" | "loading">("idle");
+
+  const discount =
+    offer.old_price > 0
+      ? Math.round(((offer.old_price - offer.price) / offer.old_price) * 100)
+      : null;
 
   const finalPrice = offer.coupon ? offer.price_with_coupon : offer.price;
+
+  function handleCopy() {
+    navigator.clipboard.writeText(buildWhatsAppText(offer));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleDispatch() {
+    if (dispatchStep === "idle") {
+      setDispatchStep("confirm");
+      return;
+    }
+    setDispatchStep("loading");
+    await fetch(`/api/admin/offers/${offer.id}/dispatch`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    onDispatched(offer.id);
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
@@ -74,14 +140,35 @@ export function OfferCard({ offer }: { offer: Offer }) {
           {offer.seller && (
             <span className="text-xs text-gray-400">{offer.seller}</span>
           )}
-          <a
-            href={offer.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 mt-1 rounded-xl bg-blue-950 hover:bg-blue-900 text-white text-sm font-medium py-2 transition-colors"
+
+          <button
+            onClick={handleCopy}
+            className="flex items-center justify-center gap-2 mt-1 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium py-2 transition-colors"
           >
-            Ver oferta <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+            {copied ? (
+              <><Check className="w-3.5 h-3.5" /> Copiado!</>
+            ) : (
+              <><WhatsAppIcon /> Copiar criativo</>
+            )}
+          </button>
+
+          <button
+            onClick={handleDispatch}
+            disabled={dispatchStep === "loading"}
+            onBlur={() => { if (dispatchStep === "confirm") setDispatchStep("idle"); }}
+            className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              dispatchStep === "confirm"
+                ? "bg-orange-500 hover:bg-orange-600 text-white"
+                : "bg-blue-950 hover:bg-blue-900 text-white"
+            }`}
+          >
+            <Send className="w-3.5 h-3.5" />
+            {dispatchStep === "confirm"
+              ? "Confirmar disparo?"
+              : dispatchStep === "loading"
+              ? "Disparando..."
+              : "Marcar como disparado"}
+          </button>
         </div>
       </div>
     </div>
