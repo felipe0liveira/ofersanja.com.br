@@ -55,6 +55,46 @@ export function OfferCard({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dispatchStep, setDispatchStep] = useState<"idle" | "confirm" | "loading">("idle");
+  const [imageOverlay, setImageOverlay] = useState<"hidden" | "visible" | "copying" | "done">("hidden");
+
+  async function handleImageCopy() {
+    if (imageOverlay === "hidden") {
+      // Mobile: first tap reveals overlay
+      setImageOverlay("visible");
+      return;
+    }
+    if (imageOverlay === "copying" || imageOverlay === "done") return;
+    setImageOverlay("copying");
+    try {
+      const res = await fetch(`/api/admin/proxy-image?url=${encodeURIComponent(offer.image)}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!res.ok) throw new Error("proxy failed");
+
+      const blob = await res.blob();
+
+      // Browsers only support image/png in ClipboardItem — convert via canvas
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d")!.drawImage(img, 0, 0);
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png");
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+      });
+
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      setImageOverlay("done");
+      setTimeout(() => setImageOverlay("hidden"), 1500);
+    } catch {
+      setImageOverlay("visible");
+    }
+  }
 
   const discount =
     offer.old_price > 0
@@ -84,7 +124,12 @@ export function OfferCard({
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col ${offer.dispatched_at ? "border-green-200 opacity-70" : "border-gray-100"}`}>
-      <div className="relative h-48 bg-gray-50">
+      <div
+        className="relative h-48 bg-gray-50 group cursor-pointer"
+        onClick={handleImageCopy}
+        onMouseEnter={() => setImageOverlay((v) => v === "hidden" ? "visible" : v)}
+        onMouseLeave={() => setImageOverlay((v) => v === "visible" ? "hidden" : v)}
+      >
         {!imageLoaded && (
           <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-t-2xl" />
         )}
@@ -96,6 +141,18 @@ export function OfferCard({
           sizes="(max-width: 768px) 100vw, 33vw"
           onLoad={() => setImageLoaded(true)}
         />
+        {/* Copy overlay */}
+        {imageLoaded && imageOverlay !== "hidden" && (
+          <div className="absolute inset-0 bg-black/40 rounded-t-2xl flex items-center justify-center transition-opacity">
+            {imageOverlay === "done" ? (
+              <Check className="w-8 h-8 text-white" />
+            ) : imageOverlay === "copying" ? (
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Copy className="w-8 h-8 text-white" />
+            )}
+          </div>
+        )}
         {discount !== null && discount > 0 && (
           <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
             -{discount}%
