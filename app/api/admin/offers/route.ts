@@ -28,7 +28,6 @@ export async function GET(request: NextRequest) {
     .get();
 
   const offers: Offer[] = snapshot.docs
-    .filter((doc) => !doc.data().dispatched_at)
     .map((doc) => {
     const data = doc.data();
     return {
@@ -46,6 +45,7 @@ export async function GET(request: NextRequest) {
       time_limited: data.time_limited,
       expiration_datetime: data.expiration_datetime?.toDate().toISOString() ?? null,
       scrapped_at: data.scrapped_at?.toDate().toISOString() ?? null,
+      dispatched_at: data.dispatched_at?.toDate().toISOString() ?? null,
     };
   });
 

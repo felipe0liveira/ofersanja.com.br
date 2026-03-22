@@ -14,8 +14,9 @@ export async function POST(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let decodedToken: Awaited<ReturnType<typeof adminAuth.verifyIdToken>>;
   try {
-    await adminAuth.verifyIdToken(idToken);
+    decodedToken = await adminAuth.verifyIdToken(idToken);
   } catch {
     return Response.json({ error: "Invalid or expired token" }, { status: 401 });
   }
@@ -25,7 +26,14 @@ export async function POST(
   await adminDb
     .collection("offers")
     .doc(id)
-    .update({ dispatched_at: new Date() });
+    .update({
+      dispatched_at: new Date(),
+      updated_by: {
+        uid: decodedToken.uid,
+        email: decodedToken.email ?? null,
+        name: decodedToken.name ?? null,
+      },
+    });
 
   return Response.json({ success: true });
 }

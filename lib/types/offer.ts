@@ -13,4 +13,5 @@ export type Offer = {
   time_limited: boolean;
   expiration_datetime: string; // ISO string (serialized from Firestore Timestamp)
   scrapped_at: string;
+  dispatched_at: string | null;
 };

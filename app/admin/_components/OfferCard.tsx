@@ -83,7 +83,7 @@ export function OfferCard({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+    <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col ${offer.dispatched_at ? "border-green-200 opacity-70" : "border-gray-100"}`}>
       <div className="relative h-48 bg-gray-50">
         {!imageLoaded && (
           <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-t-2xl" />
@@ -152,23 +152,33 @@ export function OfferCard({
             )}
           </button>
 
-          <button
-            onClick={handleDispatch}
-            disabled={dispatchStep === "loading"}
-            onBlur={() => { if (dispatchStep === "confirm") setDispatchStep("idle"); }}
-            className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              dispatchStep === "confirm"
-                ? "bg-orange-500 hover:bg-orange-600 text-white"
-                : "bg-blue-950 hover:bg-blue-900 text-white"
-            }`}
-          >
-            <Send className="w-3.5 h-3.5" />
-            {dispatchStep === "confirm"
-              ? "Confirmar disparo?"
-              : dispatchStep === "loading"
-              ? "Disparando..."
-              : "Marcar como disparado"}
-          </button>
+          {offer.dispatched_at ? (
+            <button
+              disabled
+              className="flex items-center justify-center gap-2 rounded-xl text-sm font-medium py-2 bg-gray-100 text-gray-400 cursor-not-allowed"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Já disparado
+            </button>
+          ) : (
+            <button
+              onClick={handleDispatch}
+              disabled={dispatchStep === "loading"}
+              onBlur={() => { if (dispatchStep === "confirm") setDispatchStep("idle"); }}
+              className={`flex items-center justify-center gap-2 rounded-xl text-sm font-medium py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                dispatchStep === "confirm"
+                  ? "bg-orange-500 hover:bg-orange-600 text-white"
+                  : "bg-blue-950 hover:bg-blue-900 text-white"
+              }`}
+            >
+              <Send className="w-3.5 h-3.5" />
+              {dispatchStep === "confirm"
+                ? "Confirmar disparo?"
+                : dispatchStep === "loading"
+                ? "Disparando..."
+                : "Marcar como disparado"}
+            </button>
+          )}
         </div>
       </div>
     </div>
