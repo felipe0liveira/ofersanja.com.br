@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Ofersanja Admin",
   description: "Plataforma administrativa do Ofersanja",
