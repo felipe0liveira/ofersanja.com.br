@@ -3,20 +3,37 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import Image from "next/image";
+import { ShoppingBag } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { OfferCard } from "../_components/OfferCard";
+import type { Offer } from "@/lib/types/offer";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         window.location.href = "/admin";
         return;
       }
       setUser(currentUser);
       setChecking(false);
+
+      setLoadingOffers(true);
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch("/api/admin/offers", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        setOffers(data.offers ?? []);
+      } finally {
+        setLoadingOffers(false);
+      }
     });
 
     return () => unsubscribe();
@@ -54,13 +71,33 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            Bem-vindo, {user?.displayName?.split(" ")[0]}! 👋
-          </h1>
-          <p className="text-gray-500">O dashboard está pronto para receber conteúdo.</p>
+      <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-2 mb-6">
+          <ShoppingBag className="w-5 h-5 text-blue-950" />
+          <h2 className="text-lg font-bold text-gray-800">Ofertas de hoje</h2>
+          {!loadingOffers && (
+            <span className="text-sm text-gray-400">({offers.length})</span>
+          )}
         </div>
+
+        {loadingOffers ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 h-72 animate-pulse" />
+            ))}
+          </div>
+        ) : offers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+            <ShoppingBag className="w-10 h-10 mb-3 opacity-30" />
+            <p className="text-sm">Nenhuma oferta encontrada hoje.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {offers.map((offer) => (
+              <OfferCard key={offer.id} offer={offer} />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
