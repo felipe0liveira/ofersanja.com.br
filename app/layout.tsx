@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 
@@ -6,6 +7,10 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  themeColor: "#172554",
+};
 
 export const metadata: Metadata = {
   title: "Ofersanja — As melhores ofertas no seu WhatsApp",
