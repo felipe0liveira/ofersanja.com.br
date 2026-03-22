@@ -216,7 +216,117 @@ export default function UsersPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
+            {/* Mobile: card list */}
+            <ul className="sm:hidden divide-y divide-gray-100">
+              {users.map((u) => (
+                <li key={u.id} className="px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    {u.photo ? (
+                      <Image
+                        src={u.photo}
+                        alt={u.name ?? u.email}
+                        width={40}
+                        height={40}
+                        className="rounded-full flex-shrink-0 mt-0.5"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-bold flex-shrink-0 mt-0.5">
+                        {u.email[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {u.name && (
+                        <p className="font-medium text-gray-800 text-sm truncate">{u.name}</p>
+                      )}
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {u.lastLoginAt
+                          ? new Date(u.lastLoginAt).toLocaleString("pt-BR")
+                          : "Nunca logou"}
+                      </p>
+
+                      {/* Roles row */}
+                      <div className="mt-2">
+                        {editingId === u.id ? (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {ALL_ROLES.map((r) => (
+                              <label key={r} className="flex items-center gap-1 text-xs cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={editRoles.includes(r)}
+                                  onChange={(e) =>
+                                    setEditRoles((prev) =>
+                                      e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)
+                                    )
+                                  }
+                                />
+                                {r}
+                              </label>
+                            ))}
+                            <button onClick={() => handleSaveRoles(u.id)} className="text-green-600 hover:text-green-700">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingId(null)} className="text-gray-400 hover:text-gray-600">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {u.roles.length === 0 ? (
+                              <span className="text-gray-400 text-xs">Sem roles</span>
+                            ) : (
+                              u.roles.map((r) => <RoleBadge key={r} role={r} />)
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {isAdmin && !u.roles.includes("admin") && (
+                      <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                        {deleteConfirmId === u.id ? (
+                          <div className="flex flex-col gap-1 items-end">
+                            <button
+                              onClick={() => handleDelete(u.id)}
+                              className="text-xs text-red-600 font-medium hover:underline"
+                            >
+                              Confirmar
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => { setEditingId(u.id); setEditRoles(u.roles); }}
+                              className="text-gray-400 hover:text-gray-600 p-1"
+                              title="Editar roles"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(u.id)}
+                              className="text-gray-400 hover:text-red-500 p-1"
+                              title="Remover"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: table */}
+            <table className="w-full text-sm hidden sm:table">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left font-medium text-gray-500 px-5 py-3">Usuário</th>
@@ -308,7 +418,7 @@ export default function UsersPage() {
                         ? new Date(u.lastLoginAt).toLocaleString("pt-BR")
                         : "Nunca"}
                     </td>
-                    {isAdmin && (
+                    {isAdmin && !u.roles.includes("admin") && (
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2 justify-end">
                           {deleteConfirmId === u.id ? (
