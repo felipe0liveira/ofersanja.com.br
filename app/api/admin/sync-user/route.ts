@@ -21,6 +21,24 @@ export async function POST(request: NextRequest) {
 
   const { uid, name, email, picture } = decoded;
 
+  // Authorization: user must exist in Firestore with role "admin" or "manager"
+  const usersQuery = await adminDb
+    .collection("users")
+    .where("email", "==", email)
+    .limit(1)
+    .get();
+
+  const userDoc = usersQuery.empty ? null : usersQuery.docs[0];
+  const roles: string[] = userDoc?.data().roles ?? [];
+  const isAuthorized = roles.includes("admin") || roles.includes("manager");
+
+  if (!isAuthorized) {
+    return Response.json(
+      { error: "Acesso negado. Sua conta não tem permissão para acessar esta área." },
+      { status: 403 }
+    );
+  }
+
   await adminDb
     .collection("users")
     .doc(uid)

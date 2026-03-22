@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export function LoginCard() {
@@ -15,11 +15,18 @@ export function LoginCard() {
       const result = await signInWithPopup(auth, new GoogleAuthProvider());
       const idToken = await result.user.getIdToken();
 
-      await fetch("/api/admin/sync-user", {
+      const res = await fetch("/api/admin/sync-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        await signOut(auth);
+        setError(data.error ?? "Erro ao autenticar. Tente novamente.");
+        return;
+      }
 
       window.location.href = "/admin/dashboard";
     } catch (err) {
