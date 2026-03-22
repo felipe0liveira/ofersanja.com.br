@@ -24,6 +24,9 @@ export function AdminHeader({ user, roles }: { user: User; roles: string[] }) {
         <span className="font-bold text-gray-800">Ofersanja Admin</span>
         <nav className="flex items-center gap-4">
           <Link href="/admin/dashboard" className={navClass("/admin/dashboard")}>
+            Início
+          </Link>
+          <Link href="/admin/offers" className={navClass("/admin/offers")}>
             Ofertas
           </Link>
           {isAdmin && (
