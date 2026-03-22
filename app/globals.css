@@ -4,3 +4,8 @@ html,
 body {
   background-color: #172554;
 }
+
+button,
+a {
+  cursor: pointer;
+}
