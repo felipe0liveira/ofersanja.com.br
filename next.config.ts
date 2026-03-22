@@ -10,6 +10,16 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "http2.mlstatic.com" },
     ],
   },
+
+  async rewrites() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "admin.ofersanja.com.br" }],
+        destination: "/admin/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
