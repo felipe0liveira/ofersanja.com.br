@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { WhatsAppButton } from "./_components/WhatsAppButton";
 
 export default function Home() {
   return (
@@ -20,14 +21,7 @@ export default function Home() {
             As <span className="text-amber-300/80 animate-pulse">MELHORES ofertas</span> da internet direto no seu WhatsApp!
           </h1>
 
-          <a
-            href="https://chat.whatsapp.com/DwZqHODvLErBOpJpleiHEc?mode=gi_t"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white/90 font-bold text-lg px-10 py-4 rounded-full shadow-lg transition-colors duration-200"
-          >
-            🚀 Entre no grupo VIP de ofertas
-          </a>
+          <WhatsAppButton />
         </div>
       </main>
 
