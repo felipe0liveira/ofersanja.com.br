@@ -44,7 +44,7 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _IMAGE_BASE: us-central1-docker.pkg.dev/sanjatuning/cloud-run-source-deploy/ofersanja.com.br
+  _IMAGE_BASE: us-east1-docker.pkg.dev/felipeoliveira-xyz/ofersanja/ofersanja.com.br
 
 tags:
   - github
