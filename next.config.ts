@@ -11,22 +11,7 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  async rewrites() {
-    return [
-      // API calls on the admin subdomain must NOT be prefixed — pass through unchanged
-      {
-        source: "/api/:path*",
-        has: [{ type: "host", value: "admin.ofersanja.com.br" }],
-        destination: "/api/:path*",
-      },
-      // All other paths on the admin subdomain are rewritten to /admin/*
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "admin.ofersanja.com.br" }],
-        destination: "/admin/:path*",
-      },
-    ];
-  },
 };
+
 
 export default nextConfig;

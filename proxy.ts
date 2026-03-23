@@ -11,6 +11,11 @@ export function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     const pathname = url.pathname;
 
+    // Never rewrite API routes — they must resolve as-is
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.next();
+    }
+
     // Already under /admin — no rewrite needed
     if (!pathname.startsWith("/admin")) {
       url.pathname = `/admin${pathname === "/" ? "" : pathname}`;
