@@ -22,6 +22,7 @@ function formatBRL(value: number) {
 
 export function OfferCarousel() {
   const [offers, setOffers] = useState<PublicOffer[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [visibleCount, setVisibleCount] = useState(1);
@@ -56,6 +57,7 @@ export function OfferCarousel() {
       if (last?.scrapped_at) cursorRef.current = last.scrapped_at;
     } finally {
       fetchingRef.current = false;
+      setLoaded(true);
     }
   }, []);
 
@@ -90,7 +92,7 @@ export function OfferCarousel() {
     return () => clearInterval(timer);
   }, [offers.length, visibleCount]);
 
-  if (offers.length === 0) {
+  if (!loaded) {
     return (
       <section id="ofertas" className="py-12 px-6 bg-blue-950">
         <h2 className="text-white text-2xl font-bold mb-6 text-center">🔥 Ofertas de hoje</h2>
@@ -102,6 +104,8 @@ export function OfferCarousel() {
       </section>
     );
   }
+
+  if (offers.length === 0) return null;
 
   return (
     <section id="ofertas" className="py-12 px-6 bg-blue-950">

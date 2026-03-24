@@ -12,4 +12,4 @@ function getAdminApp(): App {
 const adminApp = getAdminApp();
 
 export const adminAuth = getAuth(adminApp);
-export const adminDb = getFirestore(adminApp, "ofersanja");
+export const adminDb = getFirestore(adminApp, "(default)");
