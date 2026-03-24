@@ -50,7 +50,7 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _IMAGE_BASE: us-central1-docker.pkg.dev/ofersanja/webapp/ofersanja.com.br
+  _IMAGE_BASE: us-central1-docker.pkg.dev/ofersanja/application-images/ofersanja.com.br
   _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyC9GXvIkX5BQel3qEq-7MC-5vln3vfwf3U'
   _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'admin.ofersanja.com.br'
   _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'ofersanja'
