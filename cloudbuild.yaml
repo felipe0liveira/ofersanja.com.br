@@ -26,7 +26,7 @@ steps:
     args:
       - run
       - deploy
-      - ofersanja-website
+      - ofersanja.com.br
       - '--platform=managed'
       - '--image=$_IMAGE_BASE:$COMMIT_SHA'
       - '--labels=commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID'
@@ -50,13 +50,13 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _IMAGE_BASE: us-east1-docker.pkg.dev/felipeoliveira-xyz/ofersanja/ofersanja.com.br
-  _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyAoFseRnsKELl7mHRQIYXzC0Un2bM7JC8Q'
-  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'felipeoliveira-xyz.firebaseapp.com'
-  _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'felipeoliveira-xyz'
-  _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'felipeoliveira-xyz.firebasestorage.app'
-  _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '186749716134'
-  _NEXT_PUBLIC_FIREBASE_APP_ID: '1:186749716134:web:8db0a4eedee529e931d667'
+  _IMAGE_BASE: us-central1-docker.pkg.dev/ofersanja/webapp/ofersanja.com.br
+  _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyC9GXvIkX5BQel3qEq-7MC-5vln3vfwf3U'
+  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'admin.ofersanja.com.br'
+  _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'ofersanja'
+  _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'ofersanja.firebasestorage.app'
+  _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '843065097069'
+  _NEXT_PUBLIC_FIREBASE_APP_ID: '1:843065097069:web:63621e9d078f21abe87864'
 
 tags:
   - github
