@@ -52,7 +52,7 @@ options:
 substitutions:
   _IMAGE_BASE: us-central1-docker.pkg.dev/ofersanja/application-images/ofersanja.com.br
   _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyC9GXvIkX5BQel3qEq-7MC-5vln3vfwf3U'
-  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'admin.ofersanja.com.br'
+  _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'ofersanja.firebaseapp.com'
   _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'ofersanja'
   _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'ofersanja.firebasestorage.app'
   _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '843065097069'
