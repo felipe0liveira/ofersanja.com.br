@@ -26,7 +26,7 @@ steps:
     args:
       - run
       - deploy
-      - ofersanja.com.br
+      - ofersanja-webapp
       - '--platform=managed'
       - '--image=$_IMAGE_BASE:$COMMIT_SHA'
       - '--labels=commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID'
