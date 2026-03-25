@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, Link, Loader2, AlertCircle, Tag, Star } from "lucide-react";
 import type { Offer } from "@/lib/types/offer";
@@ -9,7 +9,7 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-type Step = "input" | "loading" | "result" | "error";
+type Step = "input" | "submitting" | "extracting" | "result" | "error";
 
 export function AddOfferModal({
   idToken,
@@ -24,12 +24,48 @@ export function AddOfferModal({
   const [url, setUrl] = useState("");
   const [offer, setOffer] = useState<Offer | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [jobId, setJobId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Start polling when jobId is set
+  useEffect(() => {
+    if (!jobId) return;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/offers/extract/${jobId}/status`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.status === "done") {
+          clearInterval(pollingRef.current!);
+          pollingRef.current = null;
+          setOffer(data.offer as Offer);
+          setStep("result");
+          onAdded(data.offer as Offer);
+        } else if (data.status === "error") {
+          clearInterval(pollingRef.current!);
+          pollingRef.current = null;
+          setErrorMsg(data.error ?? "Falha ao extrair produto.");
+          setStep("error");
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, 5_000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [jobId, idToken, onAdded]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
-    setStep("loading");
+    setStep("submitting");
     setErrorMsg("");
     try {
       const res = await fetch("/api/admin/offers/extract", {
@@ -42,13 +78,12 @@ export function AddOfferModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data?.error ?? "Erro ao extrair produto.");
+        setErrorMsg(data?.error ?? "Erro ao iniciar extração.");
         setStep("error");
         return;
       }
-      setOffer(data.offer as Offer);
-      setStep("result");
-      onAdded(data.offer as Offer);
+      setJobId(data.jobId);
+      setStep("extracting");
     } catch {
       setErrorMsg("Erro de conexão. Tente novamente.");
       setStep("error");
@@ -56,9 +91,11 @@ export function AddOfferModal({
   }
 
   function handleReset() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
     setUrl("");
     setOffer(null);
     setErrorMsg("");
+    setJobId(null);
     setStep("input");
     setTimeout(() => inputRef.current?.focus(), 50);
   }
@@ -122,8 +159,16 @@ export function AddOfferModal({
             </form>
           )}
 
-          {/* ── Loading step ── */}
-          {step === "loading" && (
+          {/* ── Submitting step ── */}
+          {step === "submitting" && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-950" />
+              <p className="text-sm font-medium">Enviando...</p>
+            </div>
+          )}
+
+          {/* ── Extracting step (polling) ── */}
+          {step === "extracting" && (
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
               <Loader2 className="w-8 h-8 animate-spin text-blue-950" />
               <p className="text-sm font-medium">Acessando o produto...</p>

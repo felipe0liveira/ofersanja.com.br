@@ -3,6 +3,51 @@ import { verifyBffToken } from "@/lib/verify-bff-token";
 import { adminDb } from "@/lib/firebase-admin";
 import { scrapeMlProduct } from "@/lib/scraper/ml-product";
 
+async function runExtraction(jobId: string, url: string) {
+  const jobRef = adminDb.collection("extraction_jobs").doc(jobId);
+  try {
+    const product = await scrapeMlProduct(url);
+
+    let slug: string;
+    const parsed = new URL(product.product_link);
+    slug = parsed.pathname.split("/").filter(Boolean)[0];
+    if (!slug) throw new Error("Empty slug");
+
+    const docData = {
+      trigger: "manual" as const,
+      name: product.name,
+      image: product.image,
+      link: product.product_link,
+      price: product.price,
+      old_price: product.old_price,
+      coupon: product.coupon,
+      coupon_description: product.coupon_description,
+      coupon_price: 0,
+      price_with_coupon: product.price_with_coupon,
+      seller: product.seller,
+      rating: product.rating,
+      time_limited: false,
+      expiration_datetime: null,
+      scrapped_at: product.scrapped_at,
+      dispatched_at: null,
+    };
+
+    await adminDb.collection("offers").doc(slug).set(docData, { merge: true });
+
+    await jobRef.update({
+      status: "done",
+      slug,
+      offer: { id: slug, ...docData, scrapped_at: product.scrapped_at.toISOString() },
+    });
+  } catch (err) {
+    console.error(`[extraction:${jobId}] failed:`, err);
+    await jobRef.update({
+      status: "error",
+      error: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const auth = await verifyBffToken(request);
   if (!auth.ok) return auth.response;
@@ -24,48 +69,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let product;
-  try {
-    product = await scrapeMlProduct(url);
-  } catch (err) {
-    console.error("scrapeMlProduct failed:", err);
-    return Response.json({ error: "Failed to scrape product" }, { status: 502 });
-  }
+  const jobId = crypto.randomUUID();
 
-  // Derive slug from the resolved product URL (handles short URLs like meli.la/…)
-  let slug: string;
-  try {
-    const parsed = new URL(product.product_link);
-    slug = parsed.pathname.split("/").filter(Boolean)[0];
-    if (!slug) throw new Error("Empty slug");
-  } catch {
-    return Response.json({ error: "Could not extract slug from product URL" }, { status: 502 });
-  }
-
-  const docData = {
-    trigger: "manual" as const,
-    name: product.name,
-    image: product.image,
-    link: product.product_link,
-    price: product.price,
-    old_price: product.old_price,
-    coupon: product.coupon,
-    coupon_description: product.coupon_description,
-    coupon_price: 0,
-    price_with_coupon: product.price_with_coupon,
-    seller: product.seller,
-    rating: product.rating,
-    time_limited: false,
-    expiration_datetime: null,
-    scrapped_at: product.scrapped_at,
-    dispatched_at: null,
-  };
-
-  await adminDb.collection("offers").doc(slug).set(docData, { merge: true });
-
-  return Response.json({
-    success: true,
-    slug,
-    offer: { id: slug, ...docData, scrapped_at: product.scrapped_at.toISOString() },
+  await adminDb.collection("extraction_jobs").doc(jobId).set({
+    status: "extracting",
+    slug: null,
+    offer: null,
+    error: null,
+    createdAt: new Date(),
   });
+
+  // Fire and forget — response is returned immediately
+  runExtraction(jobId, url);
+
+  return Response.json({ jobId }, { status: 202 });
 }
+
