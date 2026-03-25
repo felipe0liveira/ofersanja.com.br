@@ -20,7 +20,7 @@ steps:
       - '--all-tags'
       - '$_IMAGE_BASE'
     id: Push
-    timeout: 30s
+    timeout: 60s
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
     args:
