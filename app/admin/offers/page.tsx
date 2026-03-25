@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, ShoppingBag } from "lucide-react";
+import { Plus, ShoppingBag, Loader2 } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
@@ -17,6 +17,40 @@ export default function OffersPage() {
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [extractionResult, setExtractionResult] = useState<{ offer: Offer } | { error: string } | null>(null);
+
+  // Page-level polling — continues even when the modal is closed
+  useEffect(() => {
+    if (!activeJobId || !idToken) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/offers/extract/${activeJobId}/status`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "done") {
+          clearInterval(interval);
+          const newOffer = data.offer as Offer;
+          setOffers((prev) =>
+            prev.some((o) => o.id === newOffer.id)
+              ? prev.map((o) => (o.id === newOffer.id ? newOffer : o))
+              : [newOffer, ...prev]
+          );
+          setExtractionResult({ offer: newOffer });
+          setActiveJobId(null);
+        } else if (data.status === "error") {
+          clearInterval(interval);
+          setExtractionResult({ error: data.error ?? "Falha ao extrair produto." });
+          setActiveJobId(null);
+        }
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, 5_000);
+    return () => clearInterval(interval);
+  }, [activeJobId, idToken]);
 
   useEffect(() => {
     if (!idToken) return;
@@ -71,11 +105,28 @@ export default function OffersPage() {
             )}
           </div>
           <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-white font-medium transition-colors"
+            onClick={() => {
+              setExtractionResult(null);
+              setShowAddModal(true);
+            }}
+            disabled={!!activeJobId}
+            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              activeJobId
+                ? "bg-blue-900 text-white opacity-80 cursor-not-allowed"
+                : "bg-blue-950 hover:bg-blue-900 text-white"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            Adicionar oferta
+            {activeJobId ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Extraindo...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                Adicionar oferta
+              </>
+            )}
           </button>
           {!loadingOffers && (
             <div className="flex items-center gap-2 ml-auto flex-wrap">
@@ -152,13 +203,8 @@ export default function OffersPage() {
         <AddOfferModal
           idToken={idToken}
           onClose={() => setShowAddModal(false)}
-          onAdded={(newOffer) =>
-            setOffers((prev) =>
-              prev.some((o) => o.id === newOffer.id)
-                ? prev.map((o) => (o.id === newOffer.id ? newOffer : o))
-                : [newOffer, ...prev]
-            )
-          }
+          onJobStarted={(jobId) => setActiveJobId(jobId)}
+          extractionResult={extractionResult}
         />
       )}
     </div>

@@ -14,53 +14,31 @@ type Step = "input" | "submitting" | "extracting" | "result" | "error";
 export function AddOfferModal({
   idToken,
   onClose,
-  onAdded,
+  onJobStarted,
+  extractionResult,
 }: {
   idToken: string;
   onClose: () => void;
-  onAdded: (offer: Offer) => void;
+  onJobStarted: (jobId: string) => void;
+  extractionResult?: { offer: Offer } | { error: string } | null;
 }) {
   const [step, setStep] = useState<Step>("input");
   const [url, setUrl] = useState("");
   const [offer, setOffer] = useState<Offer | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start polling when jobId is set
+  // React to extraction result coming from the parent (page-level polling)
   useEffect(() => {
-    if (!jobId) return;
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/admin/offers/extract/${jobId}/status`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.status === "done") {
-          clearInterval(pollingRef.current!);
-          pollingRef.current = null;
-          setOffer(data.offer as Offer);
-          setStep("result");
-          onAdded(data.offer as Offer);
-        } else if (data.status === "error") {
-          clearInterval(pollingRef.current!);
-          pollingRef.current = null;
-          setErrorMsg(data.error ?? "Falha ao extrair produto.");
-          setStep("error");
-        }
-      } catch {
-        // network hiccup — keep polling
-      }
-    }, 5_000);
-
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [jobId, idToken, onAdded]);
+    if (!extractionResult || step !== "extracting") return;
+    if ("offer" in extractionResult) {
+      setOffer(extractionResult.offer);
+      setStep("result");
+    } else {
+      setErrorMsg(extractionResult.error);
+      setStep("error");
+    }
+  }, [extractionResult, step]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,7 +60,7 @@ export function AddOfferModal({
         setStep("error");
         return;
       }
-      setJobId(data.jobId);
+      onJobStarted(data.jobId);
       setStep("extracting");
     } catch {
       setErrorMsg("Erro de conexão. Tente novamente.");
@@ -91,11 +69,9 @@ export function AddOfferModal({
   }
 
   function handleReset() {
-    if (pollingRef.current) clearInterval(pollingRef.current);
     setUrl("");
     setOffer(null);
     setErrorMsg("");
-    setJobId(null);
     setStep("input");
     setTimeout(() => inputRef.current?.focus(), 50);
   }
@@ -167,12 +143,23 @@ export function AddOfferModal({
             </div>
           )}
 
-          {/* ── Extracting step (polling) ── */}
+          {/* ── Extracting step (polling runs in page) ── */}
           {step === "extracting" && (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-8 gap-4 text-gray-500">
               <Loader2 className="w-8 h-8 animate-spin text-blue-950" />
-              <p className="text-sm font-medium">Acessando o produto...</p>
-              <p className="text-xs text-gray-400 text-center">Isso pode levar alguns segundos</p>
+              <p className="text-sm font-medium text-gray-700">Acessando o produto...</p>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-center">
+                <p className="text-xs text-blue-700 font-medium">Você pode fechar este modal.</p>
+                <p className="text-xs text-blue-500 mt-0.5">
+                  A oferta será adicionada automaticamente quando a extração terminar.
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-sm text-gray-400 hover:text-gray-600 underline transition-colors"
+              >
+                Fechar
+              </button>
             </div>
           )}
 
