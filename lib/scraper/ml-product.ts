@@ -1,8 +1,4 @@
-import { chromium } from "playwright-core";
-import fs from "fs/promises";
-import path from "path";
-
-const SCRAPER_DEBUG = process.env.SCRAPER_DEBUG === "true";
+const ML_API_BASE = "https://api.mercadolibre.com";
 
 export type MlProductData = {
   name: string;
@@ -17,12 +13,6 @@ export type MlProductData = {
   seller: string;
   scrapped_at: Date;
 };
-
-const EXECUTABLE_PATH =
-  process.env.CHROMIUM_EXECUTABLE_PATH ?? "/usr/bin/chromium-browser";
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 function cleanUrl(url: string): string {
   return url.split("#")[0].split("?")[0];
@@ -43,276 +33,189 @@ export function isShortUrl(url: string): boolean {
 }
 
 /**
- * Resolves a short ML URL (meli.la/…) to the canonical product URL.
- * The redirect page renders an anchor with class `.poly-component__link`
- * containing the full product href.
+ * Distinguishes between catalog product IDs (/p/MLB…) and listing IDs (MLB-…).
+ * They use different API endpoints.
  */
-export async function resolveShortUrl(
-  shortUrl: string,
-  page: import("playwright-core").Page
-): Promise<string> {
-  await page.goto(shortUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForTimeout(1_500);
+function extractItemInfo(url: string): { type: "catalog" | "listing"; id: string } | null {
+  // Catalog page: /p/MLB59330343
+  const catalogMatch = url.match(/\/p\/(MLB\d+)/i);
+  if (catalogMatch) return { type: "catalog", id: catalogMatch[1].toUpperCase() };
 
-  const href = await page
-    .locator(".poly-action-links__action a.poly-component__link")
-    .first()
-    .getAttribute("href");
+  // Listing URL: MLB-5832566800-slug or …/MLB5832566800…
+  const listingMatch = url.match(/\bMLB-?(\d+)/i);
+  if (listingMatch) return { type: "listing", id: `MLB${listingMatch[1]}` };
 
-  if (!href) throw new Error(`Could not resolve short URL: ${shortUrl}`);
-  return cleanUrl(href);
+  return null;
 }
 
 /**
- * Opens a minimal browser session to resolve a short URL to its canonical
- * product link, then extracts the slug from the path. Used to do an early
- * conflict check before running the full scrape.
+ * Resolves a short ML URL (meli.la/…) to the canonical product URL by
+ * following HTTP redirects — no browser required.
+ */
+async function resolveShortUrlViaFetch(shortUrl: string): Promise<string> {
+  const resp = await fetch(shortUrl, {
+    method: "GET",
+    redirect: "follow",
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+  });
+  const finalUrl = resp.url;
+  if (!finalUrl || finalUrl === shortUrl) {
+    throw new Error(`Could not resolve short URL: ${shortUrl}`);
+  }
+  return cleanUrl(finalUrl);
+}
+
+/**
+ * Resolves a short ML URL to its canonical product link and extracts the slug.
+ * Used to do an early conflict-check before the full scrape.
  */
 export async function resolveProductSlug(url: string): Promise<string> {
-  if (!isShortUrl(url)) {
-    // For direct ML links the slug is already in the URL
-    const raw = new URL(url).pathname.split("/").filter(Boolean)[0];
-    if (!raw) throw new Error("Could not extract slug from URL");
-    return normalizeSlug(raw);
-  }
-
-  const browser = await chromium.launch({
-    executablePath: EXECUTABLE_PATH,
-    headless: true,
-    args: ["--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  try {
-    const context = await browser.newContext({ userAgent: USER_AGENT });
-    const page = await context.newPage();
-    const canonicalUrl = await resolveShortUrl(url, page);
-    const raw = new URL(canonicalUrl).pathname.split("/").filter(Boolean)[0];
-    if (!raw) throw new Error("Could not extract slug from resolved URL");
-    return normalizeSlug(raw);
-  } finally {
-    await browser.close();
-  }
-}
-
-function parseMoneyLabel(label: string): number {
-  // aria-label format: "449 reais com 99 centavos" or "282 reais"
-  const match = label.match(/(\d+(?:\.\d+)*) reais(?: com (\d+) centavos)?/);
-  if (!match) return 0;
-  const reais = parseInt(match[1].replace(/\./g, ""), 10);
-  const centavos = match[2] ? parseInt(match[2], 10) : 0;
-  return parseFloat(`${reais}.${String(centavos).padStart(2, "0")}`);
-}
-
-async function debugScreenshot(
-  page: import("playwright-core").Page,
-  label: string
-): Promise<void> {
-  if (!SCRAPER_DEBUG) return;
-  try {
-    const filename = `scraper-${Date.now()}-${label.replace(/[^a-z0-9]/gi, "_")}.png`;
-    const filepath = path.join("/tmp", filename);
-    await page.screenshot({ path: filepath, fullPage: true });
-    console.log(`[scraper] screenshot saved: ${filepath}`);
-  } catch (e) {
-    console.warn(`[scraper] screenshot failed: ${e}`);
-  }
-}
-
-export async function scrapeMlProduct(url: string): Promise<MlProductData> {
-  const browser = await chromium.launch({
-    executablePath: EXECUTABLE_PATH,
-    headless: true,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      "--disable-dev-shm-usage",
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-    ],
-  });
-
-  const context = await browser.newContext({
-    userAgent: USER_AGENT,
-    viewport: { width: 1920, height: 1080 },
-    locale: "pt-BR",
-    timezoneId: "America/Sao_Paulo",
-    extraHTTPHeaders: {
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Accept-Encoding": "gzip, deflate, br",
-    },
-  });
-
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-    (window as unknown as Record<string, unknown>).chrome = { runtime: {} };
-    const origQuery = window.navigator.permissions.query.bind(
-      window.navigator.permissions
-    );
-    window.navigator.permissions.query = (parameters: PermissionDescriptor) =>
-      parameters.name === "notifications"
-        ? Promise.resolve({ state: "denied" } as PermissionStatus)
-        : origQuery(parameters);
-  });
-
-  const page = await context.newPage();
-
-  // Resolve short URLs (meli.la/…) to the canonical product URL
-  let productLink: string;
+  let canonicalUrl = url;
   if (isShortUrl(url)) {
-    try {
-      productLink = await resolveShortUrl(url, page);
-    } catch (err) {
-      await browser.close();
-      throw err;
-    }
-  } else {
-    productLink = cleanUrl(url);
+    canonicalUrl = await resolveShortUrlViaFetch(url);
   }
+  const raw = new URL(canonicalUrl).pathname.split("/").filter(Boolean)[0];
+  if (!raw) throw new Error("Could not extract slug from URL");
+  return normalizeSlug(raw);
+}
 
-  // Navigate with retries
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await page.goto(productLink, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-      lastError = undefined;
-      break;
-    } catch (err) {
-      lastError = err;
-      await page.waitForTimeout(1_500 * (attempt + 1));
-    }
-  }
-  if (lastError) {
-    await debugScreenshot(page, "nav-error");
-    await browser.close();
-    throw lastError;
-  }
+// ── ML public REST API types ─────────────────────────────────────────────────
 
-  // ── Diagnostic logging ────────────────────────────────────────────────────
-  const diagTitle = await page.title();
-  const diagUrl = page.url();
-  console.log(`[scraper] nav done — title="${diagTitle}" url="${diagUrl}"`);
+type MlApiItem = {
+  id: string;
+  title: string;
+  price: number;
+  original_price: number | null;
+  thumbnail: string;
+  pictures: Array<{ url: string; secure_url: string }>;
+  permalink: string;
+  seller_id: number;
+  official_store_name: string | null;
+};
 
-  // Post-load wait + gradual scroll to trigger lazy content
-  await page.waitForTimeout(2_000);
-  const viewportHeight = 1080;
-  const pageHeight = await page.evaluate(() => document.body.scrollHeight);
-  for (let y = 0; y < pageHeight; y += viewportHeight) {
-    await page.evaluate((scrollY) => window.scrollTo(0, scrollY), y);
-    await page.waitForTimeout(300);
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(500);
-
-  // ── Fail-fast: verify the product page actually loaded ────────────────────
-  const titleCount = await page.locator("h1.ui-pdp-title").count();
-  if (titleCount === 0) {
-    const bodySnippet = await page.evaluate(
-      () => document.body?.innerText?.slice(0, 500) ?? ""
-    );
-    console.error(
-      `[scraper] product page not found — title="${diagTitle}" url="${diagUrl}" body="${bodySnippet}"`
-    );
-    await debugScreenshot(page, "blocked");
-    await browser.close();
-    throw new Error(
-      `ML page did not load product. title="${diagTitle}" url="${diagUrl}"`
-    );
-  }
-
-  await debugScreenshot(page, "loaded");
-
-  // ── Extraction ────────────────────────────────────────────────────────────
-
-  const name = (
-    await page.locator("h1.ui-pdp-title").textContent()
-  )?.trim() ?? "";
-
-  const image =
-    (await page
-      .locator(".ui-pdp-gallery__figure__image")
-      .first()
-      .getAttribute("src")) ?? "";
-
-  const priceContent =
-    (await page
-      .locator('meta[itemprop="price"]')
-      .first()
-      .getAttribute("content")) ?? "0";
-  const price = parseFloat(priceContent) || 0;
-
-  let old_price = 0;
-  try {
-    const oldPriceLabel = await page
-      .locator("s.ui-pdp-price__original-value")
-      .first()
-      .getAttribute("aria-label");
-    if (oldPriceLabel) old_price = parseMoneyLabel(oldPriceLabel);
-  } catch {
-    // optional field
-  }
-
-  let rating = "";
-  try {
-    rating =
-      (await page
-        .locator(".ui-pdp-review__label .andes-visually-hidden")
-        .first()
-        .textContent())?.trim() ?? "";
-  } catch {
-    // optional field
-  }
-
-  let seller = "";
-  try {
-    seller =
-      (await page
-        .locator(".ui-pdp-seller__link span")
-        .first()
-        .textContent())?.trim() ?? "";
-  } catch {
-    // optional field
-  }
-
-  let coupon_description = "";
-  try {
-    const rawCoupon = await page
-      .locator("label.ui-vpp-coupons-awareness__checkbox-label")
-      .first()
-      .textContent();
-    coupon_description = rawCoupon?.trim().replace(/\s+/g, " ") ?? "";
-  } catch {
-    // optional field
-  }
-
-  const coupon = coupon_description.length > 0;
-
-  let price_with_coupon = 0;
-  if (coupon && price > 0) {
-    const pctMatch = coupon_description.match(/(\d+)%\s*OFF/i);
-    if (pctMatch) {
-      const pct = parseInt(pctMatch[1], 10);
-      price_with_coupon = parseFloat(
-        (price * (1 - pct / 100)).toFixed(2)
-      );
-    }
-  }
-
-  await browser.close();
-
-  return {
-    name,
-    image,
-    product_link: productLink,
-    price,
-    old_price,
-    coupon,
-    coupon_description,
-    price_with_coupon,
-    rating,
-    seller,
-    scrapped_at: new Date(),
+type MlApiProduct = {
+  id: string;
+  name: string;
+  thumbnail: string;
+  pictures: Array<{ url: string; secure_url: string }>;
+  buy_box_winner?: {
+    item_id: string;
+    price: number;
+    original_price: number | null;
+    seller_id: number;
+    permalink: string;
   };
+};
+
+type MlApiUser = { nickname: string };
+
+type MlApiReviews = { rating_average: number; total: number };
+
+async function mlApiFetch<T>(path: string): Promise<T> {
+  const resp = await fetch(`${ML_API_BASE}${path}`);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`ML API ${path} → ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  return resp.json() as Promise<T>;
+}
+
+function buildImage(
+  pictures: Array<{ url: string; secure_url: string }> | undefined,
+  thumbnail: string
+): string {
+  return (
+    pictures?.[0]?.secure_url ||
+    pictures?.[0]?.url ||
+    thumbnail.replace(/-I\.jpg$/i, "-O.jpg")
+  );
+}
+
+function buildRating(result: PromiseSettledResult<MlApiReviews>): string {
+  if (result.status !== "fulfilled" || result.value.total === 0) return "";
+  const { rating_average, total } = result.value;
+  return `${rating_average.toFixed(1).replace(".", ",")} de 5 estrelas (${total} avaliações)`;
+}
+
+/**
+ * Fetches product data from the ML public API.
+ * - Catalog URLs (/p/MLB…) → GET /products/{id}
+ * - Listing URLs (MLB-…)   → GET /items/{id}
+ */
+export async function scrapeMlProduct(url: string): Promise<MlProductData> {
+  // 1. Resolve short URLs to canonical form
+  let productUrl = isShortUrl(url) ? await resolveShortUrlViaFetch(url) : url;
+  productUrl = cleanUrl(productUrl);
+
+  // 2. Determine ID type and route to the correct endpoint
+  const itemInfo = extractItemInfo(productUrl);
+  if (!itemInfo) {
+    throw new Error(`Could not extract ML item ID from URL: ${productUrl}`);
+  }
+
+  console.log(`[scraper] fetching ${itemInfo.type} ${itemInfo.id}`);
+
+  if (itemInfo.type === "catalog") {
+    // ── Catalog product (/products/{id}) ────────────────────────────────────
+    const product = await mlApiFetch<MlApiProduct>(`/products/${itemInfo.id}`);
+
+    const winner = product.buy_box_winner;
+    const sellerId = winner?.seller_id;
+    const [sellerResult, reviewsResult] = await Promise.allSettled([
+      sellerId
+        ? mlApiFetch<MlApiUser>(`/users/${sellerId}`)
+        : Promise.reject("no seller"),
+      mlApiFetch<MlApiReviews>(`/reviews/item/${itemInfo.id}`),
+    ]);
+
+    const seller =
+      sellerResult.status === "fulfilled" ? sellerResult.value.nickname : "";
+    const price = winner?.price ?? 0;
+    const old_price = winner?.original_price ?? 0;
+    const permalink = winner?.permalink ?? productUrl;
+
+    console.log(`[scraper] done: "${product.name}" — R$ ${price}`);
+
+    return {
+      name: product.name,
+      image: buildImage(product.pictures, product.thumbnail),
+      product_link: permalink,
+      price,
+      old_price,
+      coupon: false,
+      coupon_description: "",
+      price_with_coupon: 0,
+      rating: buildRating(reviewsResult),
+      seller,
+      scrapped_at: new Date(),
+    };
+  } else {
+    // ── Item listing (/items/{id}) ───────────────────────────────────────────
+    const item = await mlApiFetch<MlApiItem>(`/items/${itemInfo.id}`);
+
+    const [sellerResult, reviewsResult] = await Promise.allSettled([
+      mlApiFetch<MlApiUser>(`/users/${item.seller_id}`),
+      mlApiFetch<MlApiReviews>(`/reviews/item/${itemInfo.id}`),
+    ]);
+
+    const seller =
+      item.official_store_name ??
+      (sellerResult.status === "fulfilled" ? sellerResult.value.nickname : "");
+
+    console.log(`[scraper] done: "${item.title}" — R$ ${item.price}`);
+
+    return {
+      name: item.title,
+      image: buildImage(item.pictures, item.thumbnail),
+      product_link: item.permalink,
+      price: item.price ?? 0,
+      old_price: item.original_price ?? 0,
+      coupon: false,
+      coupon_description: "",
+      price_with_coupon: 0,
+      rating: buildRating(reviewsResult),
+      seller,
+      scrapped_at: new Date(),
+    };
+  }
 }
