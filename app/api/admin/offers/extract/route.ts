@@ -12,22 +12,7 @@ async function runExtraction(jobId: string, url: string) {
       const earlySlug = await resolveProductSlug(url);
       const existingDoc = await adminDb.collection("offers").doc(earlySlug).get();
       if (existingDoc.exists) {
-        const d = existingDoc.data()!;
-        const toIso = (v: unknown) =>
-          v && typeof (v as { toDate?: () => Date }).toDate === "function"
-            ? (v as { toDate: () => Date }).toDate().toISOString()
-            : (v ?? null);
-        await jobRef.update({
-          status: "conflict",
-          slug: earlySlug,
-          existingOffer: {
-            id: earlySlug,
-            ...d,
-            scrapped_at: toIso(d.scrapped_at),
-            dispatched_at: toIso(d.dispatched_at),
-            expiration_datetime: toIso(d.expiration_datetime),
-          },
-        });
+        await jobRef.update({ status: "conflict", slug: earlySlug });
         return;
       }
     }
@@ -43,22 +28,7 @@ async function runExtraction(jobId: string, url: string) {
     // Check if offer already exists in the collection
     const existingDoc = await adminDb.collection("offers").doc(slug).get();
     if (existingDoc.exists) {
-      const d = existingDoc.data()!;
-      const toIso = (v: unknown) =>
-        v && typeof (v as { toDate?: () => Date }).toDate === "function"
-          ? (v as { toDate: () => Date }).toDate().toISOString()
-          : (v ?? null);
-      await jobRef.update({
-        status: "conflict",
-        slug,
-        existingOffer: {
-          id: slug,
-          ...d,
-          scrapped_at: toIso(d.scrapped_at),
-          dispatched_at: toIso(d.dispatched_at),
-          expiration_datetime: toIso(d.expiration_datetime),
-        },
-      });
+      await jobRef.update({ status: "conflict", slug });
       return;
     }
 
@@ -86,7 +56,6 @@ async function runExtraction(jobId: string, url: string) {
     await jobRef.update({
       status: "done",
       slug,
-      offer: { id: slug, ...docData, scrapped_at: product.scrapped_at.toISOString() },
     });
   } catch (err) {
     console.error(`[extraction:${jobId}] failed:`, err);
@@ -157,7 +126,6 @@ export async function POST(request: NextRequest) {
   await adminDb.collection("extraction_jobs").doc(jobId).set({
     status: "extracting",
     slug: null,
-    offer: null,
     error: null,
     createdAt: new Date(),
   });

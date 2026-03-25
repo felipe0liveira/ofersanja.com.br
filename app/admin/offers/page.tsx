@@ -45,7 +45,7 @@ export default function OffersPage() {
           setActiveJobId(null);
         } else if (data.status === "conflict") {
           clearInterval(interval);
-          const existing = data.existingOffer as Offer;
+          const existing = data.offer as Offer;
           setExtractionResult({ conflict: existing });
           setActiveJobId(null);
           // Auto-scroll only when modal is already closed

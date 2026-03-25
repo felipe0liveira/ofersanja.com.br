@@ -61,7 +61,7 @@ export function AddOfferModal({
       });
       const data = await res.json();
       if (res.status === 409 && data.conflict) {
-        setOffer(data.existingOffer as Offer);
+        setOffer(data.offer as Offer);
         setStep("conflict");
         return;
       }
