@@ -60,6 +60,11 @@ export function AddOfferModal({
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
+      if (res.status === 409 && data.conflict) {
+        setOffer(data.existingOffer as Offer);
+        setStep("conflict");
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(data?.error ?? "Erro ao iniciar extração.");
         setStep("error");

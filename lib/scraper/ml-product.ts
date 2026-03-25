@@ -24,7 +24,7 @@ function cleanUrl(url: string): string {
   return url.split("#")[0].split("?")[0];
 }
 
-function isShortUrl(url: string): boolean {
+export function isShortUrl(url: string): boolean {
   try {
     const { hostname } = new URL(url);
     return hostname === "meli.la" || hostname === "mercadolivre.page.link";

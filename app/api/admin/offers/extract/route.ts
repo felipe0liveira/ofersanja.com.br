@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
 import { adminDb } from "@/lib/firebase-admin";
-import { scrapeMlProduct } from "@/lib/scraper/ml-product";
+import { scrapeMlProduct, isShortUrl } from "@/lib/scraper/ml-product";
 
 async function runExtraction(jobId: string, url: string) {
   const jobRef = adminDb.collection("extraction_jobs").doc(jobId);
@@ -89,6 +89,40 @@ export async function POST(request: NextRequest) {
       { error: "URL must be from mercadolivre.com.br or meli.la" },
       { status: 400 }
     );
+  }
+
+  // Early synchronous conflict check — only possible for direct ML URLs where the
+  // slug is already visible in the path (short URLs need scraping first)
+  if (!isShortUrl(url)) {
+    try {
+      const parsed = new URL(url);
+      const candidateSlug = parsed.pathname.split("/").filter(Boolean)[0];
+      if (candidateSlug) {
+        const existingDoc = await adminDb.collection("offers").doc(candidateSlug).get();
+        if (existingDoc.exists) {
+          const d = existingDoc.data()!;
+          const toIso = (v: unknown) =>
+            v && typeof (v as { toDate?: () => Date }).toDate === "function"
+              ? (v as { toDate: () => Date }).toDate().toISOString()
+              : (v ?? null);
+          return Response.json(
+            {
+              conflict: true,
+              existingOffer: {
+                id: candidateSlug,
+                ...d,
+                scrapped_at: toIso(d.scrapped_at),
+                dispatched_at: toIso(d.dispatched_at),
+                expiration_datetime: toIso(d.expiration_datetime),
+              },
+            },
+            { status: 409 }
+          );
+        }
+      }
+    } catch {
+      // Malformed URL — let the scraper handle it and fail naturally
+    }
   }
 
   const jobId = crypto.randomUUID();
