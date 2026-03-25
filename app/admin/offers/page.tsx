@@ -43,19 +43,13 @@ export default function OffersPage() {
           );
           setExtractionResult({ offer: newOffer });
           setActiveJobId(null);
+          if (!showAddModalRef.current) setShowAddModal(true);
         } else if (data.status === "conflict") {
           clearInterval(interval);
           const existing = data.offer as Offer;
           setExtractionResult({ conflict: existing });
           setActiveJobId(null);
-          // Auto-scroll only when modal is already closed
-          if (!showAddModalRef.current) {
-            setHighlightedOfferId(existing.id);
-            setTimeout(() => {
-              document.getElementById(`offer-${existing.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 150);
-            setTimeout(() => setHighlightedOfferId(null), 4000);
-          }
+          if (!showAddModalRef.current) setShowAddModal(true);
         } else if (data.status === "error") {
           clearInterval(interval);
           setExtractionResult({ error: data.error ?? "Falha ao extrair produto." });
