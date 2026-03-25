@@ -95,11 +95,11 @@ export function OfferCarousel() {
 
   if (!loaded) {
     return (
-      <section id="ofertas" className="py-12 px-6 bg-blue-950">
-        <h2 className="text-white text-2xl font-bold mb-6 text-center">🔥 Ofertas de hoje</h2>
+      <section id="ofertas" className="py-12 px-6 bg-gray-50 border-y border-gray-100">
+        <h2 className="text-slate-800 text-2xl font-bold mb-6 text-center">🔥 Ofertas de hoje</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white/10 rounded-2xl h-72 animate-pulse" />
+            <div key={i} className="bg-gray-200 rounded-2xl h-72 animate-pulse" />
           ))}
         </div>
       </section>
@@ -109,8 +109,8 @@ export function OfferCarousel() {
   if (offers.length === 0) return null;
 
   return (
-    <section id="ofertas" className="py-12 px-6 bg-blue-950">
-      <h2 className="text-white text-2xl font-bold mb-6 text-center">🔥 Ofertas de hoje</h2>
+    <section id="ofertas" className="py-12 px-6 bg-gray-50 border-y border-gray-100">
+      <h2 className="text-slate-800 text-2xl font-bold mb-6 text-center">🔥 Ofertas de hoje</h2>
       <div ref={containerRef} className="overflow-hidden max-w-5xl mx-auto">
         <div
           className="flex transition-transform duration-700 ease-in-out"
