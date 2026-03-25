@@ -76,6 +76,19 @@ export default function OffersPage() {
     return () => clearInterval(interval);
   }, [activeJobId, idToken]);
 
+  // On mount: recover any in-progress extraction job and resume polling
+  useEffect(() => {
+    if (!idToken) return;
+    fetch("/api/admin/offers/extract/active", {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.jobId) setActiveJobId(d.jobId);
+      })
+      .catch(() => {/* ignore — non-critical */});
+  }, [idToken]);
+
   useEffect(() => {
     if (!idToken) return;
     setLoadingOffers(true);
