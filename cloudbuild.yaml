@@ -58,7 +58,7 @@ steps:
       - '--labels=commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID'
       - '--allow-unauthenticated'
       - '--region=us-central1'
-      - '--memory=512Mi'
+      - '--memory=1Gi'
       - '--cpu=1'
       - '--min-instances=1'
       - '--max-instances=1'
