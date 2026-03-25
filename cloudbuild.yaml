@@ -63,6 +63,8 @@ steps:
       - '--min-instances=1'
       - '--max-instances=1'
       - '--concurrency=80'
+      - '--set-secrets'
+      - 'ML_AFFILIATE_SSID=mercadolivre-ssid:latest'
       - '--quiet'
     id: Deploy
     timeout: 120s
