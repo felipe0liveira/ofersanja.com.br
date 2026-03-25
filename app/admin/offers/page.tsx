@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ShoppingBag } from "lucide-react";
+import { Plus, ShoppingBag } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
+import { AddOfferModal } from "../_components/AddOfferModal";
 import type { Offer } from "@/lib/types/offer";
 
 type SortBy = "default" | "price_asc" | "price_desc" | "discount_desc" | "discount_asc";
@@ -15,6 +16,7 @@ export default function OffersPage() {
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const [showDispatched, setShowDispatched] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     if (!idToken) return;
@@ -68,6 +70,13 @@ export default function OffersPage() {
               <span className="text-sm text-gray-400">({displayedOffers.length})</span>
             )}
           </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-white font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Adicionar oferta
+          </button>
           {!loadingOffers && (
             <div className="flex items-center gap-2 ml-auto flex-wrap">
               <select
@@ -138,6 +147,20 @@ export default function OffersPage() {
           </div>
         )}
       </main>
+
+      {showAddModal && idToken && (
+        <AddOfferModal
+          idToken={idToken}
+          onClose={() => setShowAddModal(false)}
+          onAdded={(newOffer) =>
+            setOffers((prev) =>
+              prev.some((o) => o.id === newOffer.id)
+                ? prev.map((o) => (o.id === newOffer.id ? newOffer : o))
+                : [newOffer, ...prev]
+            )
+          }
+        />
+      )}
     </div>
   );
 }

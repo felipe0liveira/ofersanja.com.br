@@ -163,6 +163,11 @@ export function OfferCard({
             <Clock className="w-3 h-3" /> Limitado
           </span>
         )}
+        {offer.trigger === "manual" && (
+          <span className="absolute bottom-2 left-2 bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            Manual
+          </span>
+        )}
       </div>
 
       <div className="p-4 flex flex-col flex-1 gap-3">
