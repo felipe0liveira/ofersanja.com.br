@@ -9,6 +9,17 @@ steps:
         docker pull $_IMAGE_BASE:latest || true
     timeout: 60s
 
+  # Ensure base-runner image exists — builds and pushes it on first run,
+  # then just pulls it on subsequent runs.
+  - name: gcr.io/cloud-builders/docker
+    id: EnsureBase
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker pull $_BASE_RUNNER || (docker build -f Dockerfile.base -t $_BASE_RUNNER . && docker push $_BASE_RUNNER)
+    timeout: 300s
+
   - name: 'gcr.io/cloud-builders/docker'
     id: Build
     timeout: 300s
