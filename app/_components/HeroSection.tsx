@@ -21,7 +21,7 @@ const fadeIn: Variants = {
 
 export function HeroSection() {
   return (
-    <section className="relative bg-gradient-to-br from-slate-50 via-white to-emerald-50/40">
+    <section className="relative bg-gradient-to-br from-white via-emerald-50/80 to-emerald-100/80">
       <div className="relative min-h-[90vh] flex flex-col md:flex-row items-center gap-10 max-w-6xl mx-auto px-6 py-20">
       {/* Left — text (order-2 on mobile so avatar shows first) */}
       <motion.div
