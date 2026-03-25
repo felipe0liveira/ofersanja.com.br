@@ -20,9 +20,9 @@ export function Navbar() {
     >
       <div className="max-w-6xl mx-auto h-16 flex items-center justify-between px-6">
         {/* Logo */}
-        <a href="/" className="flex items-center gap-2 font-extrabold text-xl text-slate-900 tracking-tight">
+        <a href="/" className="flex items-center font-extrabold text-xl text-slate-900 tracking-tight">
           Ofer<span className="text-emerald-600">sanja</span>
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mb-0.5" />
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 ml-2" />
         </a>
 
         {/* CTA */}

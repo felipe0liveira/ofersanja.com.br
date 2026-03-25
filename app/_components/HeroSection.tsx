@@ -21,13 +21,14 @@ const fadeIn: Variants = {
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[90vh] flex flex-col md:flex-row items-center gap-12 max-w-6xl mx-auto px-6 py-20">
-      {/* Left — text */}
+    <section className="relative bg-gradient-to-br from-slate-50 via-white to-emerald-50/40">
+      <div className="relative min-h-[90vh] flex flex-col md:flex-row items-center gap-10 max-w-6xl mx-auto px-6 py-20">
+      {/* Left — text (order-2 on mobile so avatar shows first) */}
       <motion.div
         variants={container}
         initial="hidden"
         animate="show"
-        className="flex-1 flex flex-col items-center md:items-start gap-6 text-center md:text-left"
+        className="order-2 md:order-1 flex-1 flex flex-col items-center md:items-start gap-6 text-center md:text-left"
       >
         <motion.div variants={item}>
           <span className="inline-block bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-widest uppercase px-4 py-1.5 rounded-full border border-emerald-100">
@@ -37,7 +38,7 @@ export function HeroSection() {
 
         <motion.h1
           variants={item}
-          className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight max-w-xl"
+          className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-700 leading-tight max-w-xl"
         >
           As <span className="text-emerald-600">melhores ofertas</span> da internet no seu WhatsApp 📲
         </motion.h1>
@@ -68,24 +69,21 @@ export function HeroSection() {
         </motion.div>
       </motion.div>
 
-      {/* Right — avatar */}
+      {/* Right — avatar (order-1 on mobile so it renders above text) */}
       <motion.div
         variants={fadeIn}
         initial="hidden"
         animate="show"
-        className="shrink-0 w-full max-w-xs md:max-w-sm lg:max-w-md"
+        className="order-1 md:order-2 shrink-0 w-full max-w-[260px] md:max-w-sm lg:max-w-md overflow-hidden"
       >
-        <div className="relative">
-          <div className="absolute -inset-4 bg-emerald-100/50 rounded-[2.5rem] blur-2xl" />
-          <Image
-            src="/ofersanja-avatar-squared.png"
-            alt="Ofersanja"
-            width={480}
-            height={480}
-            className="relative rounded-3xl shadow-2xl object-cover w-full h-auto"
-            priority
-          />
-        </div>
+        <Image
+          src="/ofersanja-avatar-squared.png"
+          alt="Ofersanja"
+          width={480}
+          height={480}
+          className="object-cover w-full h-auto scale-[1.3]"
+          priority
+        />
       </motion.div>
 
       {/* Scroll arrow */}
@@ -99,6 +97,7 @@ export function HeroSection() {
           <path d="M6 9l6 6 6-6" />
         </svg>
       </a>
+      </div>
     </section>
   );
 }
