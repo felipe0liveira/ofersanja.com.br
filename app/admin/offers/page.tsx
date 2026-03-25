@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, ShoppingBag, Loader2 } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
 import { AddOfferModal } from "../_components/AddOfferModal";
+import { ToastStack } from "../_components/ToastStack";
+import type { Toast } from "../_components/ToastStack";
 import type { Offer } from "@/lib/types/offer";
 
 type SortBy = "default" | "price_asc" | "price_desc" | "discount_desc" | "discount_asc";
@@ -20,8 +22,18 @@ export default function OffersPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [extractionResult, setExtractionResult] = useState<{ offer: Offer } | { error: string } | { conflict: Offer } | null>(null);
   const [highlightedOfferId, setHighlightedOfferId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
   showAddModalRef.current = showAddModal;
+
+  const addToast = useCallback((type: Toast["type"], message: string) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   // Page-level polling — continues even when the modal is closed
   useEffect(() => {
@@ -43,17 +55,18 @@ export default function OffersPage() {
           );
           setExtractionResult({ offer: newOffer });
           setActiveJobId(null);
-          if (!showAddModalRef.current) setShowAddModal(true);
+          if (!showAddModalRef.current) addToast("success", "Extração finalizada com sucesso!");
         } else if (data.status === "conflict") {
           clearInterval(interval);
           const existing = data.offer as Offer;
           setExtractionResult({ conflict: existing });
           setActiveJobId(null);
-          if (!showAddModalRef.current) setShowAddModal(true);
+          if (!showAddModalRef.current) addToast("warning", "Oferta já existente.");
         } else if (data.status === "error") {
           clearInterval(interval);
           setExtractionResult({ error: data.error ?? "Falha ao extrair produto." });
           setActiveJobId(null);
+          if (!showAddModalRef.current) addToast("error", "Erro na extração.");
         }
       } catch {
         // network hiccup — keep polling
@@ -236,6 +249,8 @@ export default function OffersPage() {
           onScrollToOffer={handleScrollToOffer}
         />
       )}
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

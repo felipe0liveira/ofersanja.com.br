@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           return Response.json(
             {
               conflict: true,
-              existingOffer: {
+              offer: {
                 id: candidateSlug,
                 ...d,
                 scrapped_at: toIso(d.scrapped_at),
