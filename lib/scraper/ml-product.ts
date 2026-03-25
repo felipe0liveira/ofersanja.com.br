@@ -24,6 +24,36 @@ function cleanUrl(url: string): string {
   return url.split("#")[0].split("?")[0];
 }
 
+function isShortUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "meli.la" || hostname === "mercadolivre.page.link";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves a short ML URL (meli.la/…) to the canonical product URL.
+ * The redirect page renders an anchor with class `.poly-component__link`
+ * containing the full product href.
+ */
+async function resolveShortUrl(
+  shortUrl: string,
+  page: import("playwright-core").Page
+): Promise<string> {
+  await page.goto(shortUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.waitForTimeout(1_500);
+
+  const href = await page
+    .locator(".poly-action-links__action a.poly-component__link")
+    .first()
+    .getAttribute("href");
+
+  if (!href) throw new Error(`Could not resolve short URL: ${shortUrl}`);
+  return cleanUrl(href);
+}
+
 function parseMoneyLabel(label: string): number {
   // aria-label format: "449 reais com 99 centavos" or "282 reais"
   const match = label.match(/(\d+(?:\.\d+)*) reais(?: com (\d+) centavos)?/);
@@ -34,8 +64,6 @@ function parseMoneyLabel(label: string): number {
 }
 
 export async function scrapeMlProduct(url: string): Promise<MlProductData> {
-  const productLink = cleanUrl(url);
-
   const browser = await chromium.launch({
     executablePath: EXECUTABLE_PATH,
     headless: true,
@@ -73,6 +101,19 @@ export async function scrapeMlProduct(url: string): Promise<MlProductData> {
   });
 
   const page = await context.newPage();
+
+  // Resolve short URLs (meli.la/…) to the canonical product URL
+  let productLink: string;
+  if (isShortUrl(url)) {
+    try {
+      productLink = await resolveShortUrl(url, page);
+    } catch (err) {
+      await browser.close();
+      throw err;
+    }
+  } else {
+    productLink = cleanUrl(url);
+  }
 
   // Navigate with retries
   let lastError: unknown;

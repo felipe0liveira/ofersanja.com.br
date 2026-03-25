@@ -16,20 +16,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!url.includes("mercadolivre.com.br")) {
+  const isMl = url.includes("mercadolivre.com.br") || url.includes("meli.la") || url.includes("mercadolivre.page.link");
+  if (!isMl) {
     return Response.json(
-      { error: "URL must be from mercadolivre.com.br" },
+      { error: "URL must be from mercadolivre.com.br or meli.la" },
       { status: 400 }
     );
-  }
-
-  let slug: string;
-  try {
-    const parsed = new URL(url);
-    slug = parsed.pathname.split("/").filter(Boolean)[0];
-    if (!slug) throw new Error("Empty slug");
-  } catch {
-    return Response.json({ error: "Could not extract slug from URL" }, { status: 400 });
   }
 
   let product;
@@ -38,6 +30,16 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("scrapeMlProduct failed:", err);
     return Response.json({ error: "Failed to scrape product" }, { status: 502 });
+  }
+
+  // Derive slug from the resolved product URL (handles short URLs like meli.la/…)
+  let slug: string;
+  try {
+    const parsed = new URL(product.product_link);
+    slug = parsed.pathname.split("/").filter(Boolean)[0];
+    if (!slug) throw new Error("Empty slug");
+  } catch {
+    return Response.json({ error: "Could not extract slug from product URL" }, { status: 502 });
   }
 
   const docData = {
