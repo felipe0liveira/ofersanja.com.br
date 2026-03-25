@@ -1,11 +1,26 @@
 steps:
+  # Pull previous images for layer cache (ignore failure on first run)
+  - name: gcr.io/cloud-builders/docker
+    id: PullCache
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker pull $_IMAGE_BASE:latest || true
+    timeout: 60s
+
   - name: 'gcr.io/cloud-builders/docker'
     id: Build
-    timeout: 180s
+    timeout: 300s
+    env:
+      - DOCKER_BUILDKIT=1
     args:
       - build
-      - '-t'
-      - '$_IMAGE_BASE:$COMMIT_SHA'
+      - '--build-arg=BUILDKIT_INLINE_CACHE=1'
+      - '--cache-from=$_IMAGE_BASE:latest'
+      - '--build-arg=BASE_RUNNER=$_BASE_RUNNER'
+      - '-t=$_IMAGE_BASE:$COMMIT_SHA'
+      - '-t=$_IMAGE_BASE:latest'
       - '--build-arg=NEXT_PUBLIC_FIREBASE_API_KEY=$_NEXT_PUBLIC_FIREBASE_API_KEY'
       - '--build-arg=NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'
       - '--build-arg=NEXT_PUBLIC_FIREBASE_PROJECT_ID=$_NEXT_PUBLIC_FIREBASE_PROJECT_ID'
@@ -51,6 +66,7 @@ options:
 
 substitutions:
   _IMAGE_BASE: us-central1-docker.pkg.dev/ofersanja/application-images/ofersanja.com.br
+  _BASE_RUNNER: us-central1-docker.pkg.dev/ofersanja/application-images/base-runner:latest
   _NEXT_PUBLIC_FIREBASE_API_KEY: 'AIzaSyC9GXvIkX5BQel3qEq-7MC-5vln3vfwf3U'
   _NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'ofersanja.firebaseapp.com'
   _NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'ofersanja'

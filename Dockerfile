@@ -1,5 +1,14 @@
 # Dockerfile for Next.js app optimized for Google Cloud Run
 # Multi-stage build: standalone output keeps the final image small.
+#
+# Cache strategy:
+#   BASE_RUNNER  — pre-built image with Chromium (Dockerfile.base). Rebuild with: make build-base
+#   builder-cache tag — BuildKit inline cache for npm ci + next build layers
+#
+# Build args:
+#   BASE_RUNNER  — base runner image (default: Artifact Registry base-runner:latest)
+
+ARG BASE_RUNNER=us-central1-docker.pkg.dev/ofersanja/application-images/base-runner:latest
 
 # Stage 1: Builder
 FROM node:20-alpine AS builder
@@ -29,18 +38,16 @@ ENV NODE_ENV=production
 
 RUN npm run build
 
-# Stage 2: Runner
-FROM node:20-alpine AS runner
+# Stage 2: Runner — uses pre-built base image (Chromium already installed)
+FROM ${BASE_RUNNER} AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
-ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont && \
-    addgroup --system --gid 1001 nodejs && \
+RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
