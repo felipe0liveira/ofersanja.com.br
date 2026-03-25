@@ -24,6 +24,11 @@ function cleanUrl(url: string): string {
   return url.split("#")[0].split("?")[0];
 }
 
+/** Strips the MLB-XXXXXXXX- prefix that ML includes in URL path segments. */
+export function normalizeSlug(raw: string): string {
+  return raw.replace(/^MLB-\d+-/i, "");
+}
+
 export function isShortUrl(url: string): boolean {
   try {
     const { hostname } = new URL(url);
@@ -38,7 +43,7 @@ export function isShortUrl(url: string): boolean {
  * The redirect page renders an anchor with class `.poly-component__link`
  * containing the full product href.
  */
-async function resolveShortUrl(
+export async function resolveShortUrl(
   shortUrl: string,
   page: import("playwright-core").Page
 ): Promise<string> {
@@ -52,6 +57,36 @@ async function resolveShortUrl(
 
   if (!href) throw new Error(`Could not resolve short URL: ${shortUrl}`);
   return cleanUrl(href);
+}
+
+/**
+ * Opens a minimal browser session to resolve a short URL to its canonical
+ * product link, then extracts the slug from the path. Used to do an early
+ * conflict check before running the full scrape.
+ */
+export async function resolveProductSlug(url: string): Promise<string> {
+  if (!isShortUrl(url)) {
+    // For direct ML links the slug is already in the URL
+    const raw = new URL(url).pathname.split("/").filter(Boolean)[0];
+    if (!raw) throw new Error("Could not extract slug from URL");
+    return normalizeSlug(raw);
+  }
+
+  const browser = await chromium.launch({
+    executablePath: EXECUTABLE_PATH,
+    headless: true,
+    args: ["--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"],
+  });
+  try {
+    const context = await browser.newContext({ userAgent: USER_AGENT });
+    const page = await context.newPage();
+    const canonicalUrl = await resolveShortUrl(url, page);
+    const raw = new URL(canonicalUrl).pathname.split("/").filter(Boolean)[0];
+    if (!raw) throw new Error("Could not extract slug from resolved URL");
+    return normalizeSlug(raw);
+  } finally {
+    await browser.close();
+  }
 }
 
 function parseMoneyLabel(label: string): number {

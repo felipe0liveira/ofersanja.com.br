@@ -1,16 +1,43 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
 import { adminDb } from "@/lib/firebase-admin";
-import { scrapeMlProduct, isShortUrl } from "@/lib/scraper/ml-product";
+import { scrapeMlProduct, isShortUrl, resolveProductSlug, normalizeSlug } from "@/lib/scraper/ml-product";
 
 async function runExtraction(jobId: string, url: string) {
   const jobRef = adminDb.collection("extraction_jobs").doc(jobId);
   try {
+    // For short URLs: resolve to canonical URL first, extract slug, check for
+    // conflict before paying the cost of a full page scrape.
+    if (isShortUrl(url)) {
+      const earlySlug = await resolveProductSlug(url);
+      const existingDoc = await adminDb.collection("offers").doc(earlySlug).get();
+      if (existingDoc.exists) {
+        const d = existingDoc.data()!;
+        const toIso = (v: unknown) =>
+          v && typeof (v as { toDate?: () => Date }).toDate === "function"
+            ? (v as { toDate: () => Date }).toDate().toISOString()
+            : (v ?? null);
+        await jobRef.update({
+          status: "conflict",
+          slug: earlySlug,
+          existingOffer: {
+            id: earlySlug,
+            ...d,
+            scrapped_at: toIso(d.scrapped_at),
+            dispatched_at: toIso(d.dispatched_at),
+            expiration_datetime: toIso(d.expiration_datetime),
+          },
+        });
+        return;
+      }
+    }
+
     const product = await scrapeMlProduct(url);
 
     let slug: string;
     const parsed = new URL(product.product_link);
-    slug = parsed.pathname.split("/").filter(Boolean)[0];
+    const rawSlug = parsed.pathname.split("/").filter(Boolean)[0];
+    slug = normalizeSlug(rawSlug);
     if (!slug) throw new Error("Empty slug");
 
     // Check if offer already exists in the collection
@@ -96,7 +123,7 @@ export async function POST(request: NextRequest) {
   if (!isShortUrl(url)) {
     try {
       const parsed = new URL(url);
-      const candidateSlug = parsed.pathname.split("/").filter(Boolean)[0];
+      const candidateSlug = normalizeSlug(parsed.pathname.split("/").filter(Boolean)[0] ?? "");
       if (candidateSlug) {
         const existingDoc = await adminDb.collection("offers").doc(candidateSlug).get();
         if (existingDoc.exists) {
