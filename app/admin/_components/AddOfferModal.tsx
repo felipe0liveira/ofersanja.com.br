@@ -2,25 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { X, Link, Loader2, AlertCircle, Tag, Star } from "lucide-react";
+import { X, Link, Loader2, AlertCircle, Tag, Star, PackageSearch } from "lucide-react";
 import type { Offer } from "@/lib/types/offer";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-type Step = "input" | "submitting" | "extracting" | "result" | "error";
+type Step = "input" | "submitting" | "extracting" | "result" | "error" | "conflict";
 
 export function AddOfferModal({
   idToken,
   onClose,
   onJobStarted,
   extractionResult,
+  onScrollToOffer,
 }: {
   idToken: string;
   onClose: () => void;
   onJobStarted: (jobId: string) => void;
-  extractionResult?: { offer: Offer } | { error: string } | null;
+  extractionResult?: { offer: Offer } | { error: string } | { conflict: Offer } | null;
+  onScrollToOffer: (offerId: string) => void;
 }) {
   const [step, setStep] = useState<Step>("input");
   const [url, setUrl] = useState("");
@@ -34,6 +36,9 @@ export function AddOfferModal({
     if ("offer" in extractionResult) {
       setOffer(extractionResult.offer);
       setStep("result");
+    } else if ("conflict" in extractionResult) {
+      setOffer(extractionResult.conflict);
+      setStep("conflict");
     } else {
       setErrorMsg(extractionResult.error);
       setStep("error");
@@ -160,6 +165,47 @@ export function AddOfferModal({
               >
                 Fechar
               </button>
+            </div>
+          )}
+
+          {/* ── Conflict step ── */}
+          {step === "conflict" && offer && (
+            <div className="flex flex-col gap-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 flex flex-col items-center gap-2 text-center">
+                <PackageSearch className="w-8 h-8 text-amber-500" />
+                <p className="text-sm font-semibold text-amber-800">Produto já está na lista!</p>
+                <p className="text-xs text-amber-600">Este produto já foi adicionado às ofertas de hoje.</p>
+              </div>
+              <div className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
+                <div className="relative w-16 h-16 shrink-0 bg-gray-50 rounded-lg overflow-hidden">
+                  <Image
+                    src={offer.image}
+                    alt={offer.name}
+                    fill
+                    className="object-contain p-1"
+                    sizes="64px"
+                    unoptimized
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <p className="text-xs font-medium text-gray-800 line-clamp-2 leading-snug">{offer.name}</p>
+                  <p className="text-sm font-bold text-gray-900">{formatBRL(offer.price)}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                >
+                  Adicionar outro
+                </button>
+                <button
+                  onClick={() => onScrollToOffer(offer.id)}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                >
+                  Ver produto
+                </button>
+              </div>
             </div>
           )}
 

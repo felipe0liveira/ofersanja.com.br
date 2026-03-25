@@ -23,6 +23,7 @@ export async function GET(
     status: data.status,
     slug: data.slug ?? null,
     offer: data.offer ?? null,
+    existingOffer: data.existingOffer ?? null,
     error: data.error ?? null,
   });
 }

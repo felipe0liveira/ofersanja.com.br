@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, ShoppingBag, Loader2 } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
@@ -18,7 +18,10 @@ export default function OffersPage() {
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [extractionResult, setExtractionResult] = useState<{ offer: Offer } | { error: string } | null>(null);
+  const [extractionResult, setExtractionResult] = useState<{ offer: Offer } | { error: string } | { conflict: Offer } | null>(null);
+  const [highlightedOfferId, setHighlightedOfferId] = useState<string | null>(null);
+  const showAddModalRef = useRef(false);
+  showAddModalRef.current = showAddModal;
 
   // Page-level polling — continues even when the modal is closed
   useEffect(() => {
@@ -40,6 +43,19 @@ export default function OffersPage() {
           );
           setExtractionResult({ offer: newOffer });
           setActiveJobId(null);
+        } else if (data.status === "conflict") {
+          clearInterval(interval);
+          const existing = data.existingOffer as Offer;
+          setExtractionResult({ conflict: existing });
+          setActiveJobId(null);
+          // Auto-scroll only when modal is already closed
+          if (!showAddModalRef.current) {
+            setHighlightedOfferId(existing.id);
+            setTimeout(() => {
+              document.getElementById(`offer-${existing.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 150);
+            setTimeout(() => setHighlightedOfferId(null), 4000);
+          }
         } else if (data.status === "error") {
           clearInterval(interval);
           setExtractionResult({ error: data.error ?? "Falha ao extrair produto." });
@@ -62,6 +78,15 @@ export default function OffersPage() {
       .then((d) => setOffers(d.offers ?? []))
       .finally(() => setLoadingOffers(false));
   }, [idToken]);
+
+  function handleScrollToOffer(offerId: string) {
+    setShowAddModal(false);
+    setHighlightedOfferId(offerId);
+    setTimeout(() => {
+      document.getElementById(`offer-${offerId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    setTimeout(() => setHighlightedOfferId(null), 4000);
+  }
 
   const dispatchedCount = offers.filter((o) => o.dispatched_at).length;
 
@@ -108,7 +133,7 @@ export default function OffersPage() {
             onClick={() => {
               setExtractionResult(null);
               setShowAddModal(true);
-            }}
+            }}           
             disabled={!!activeJobId}
             className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
               activeJobId
@@ -182,18 +207,27 @@ export default function OffersPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {displayedOffers.map((offer) => (
-              <OfferCard
+              <div
                 key={offer.id}
-                offer={offer}
-                idToken={idToken}
-                onDispatched={(id) =>
-                  setOffers((prev) =>
-                    prev.map((o) =>
-                      o.id === id ? { ...o, dispatched_at: new Date().toISOString() } : o
+                id={`offer-${offer.id}`}
+                className={`rounded-2xl transition-all duration-700 ${
+                  highlightedOfferId === offer.id
+                    ? "ring-2 ring-amber-400 shadow-lg shadow-amber-100"
+                    : ""
+                }`}
+              >
+                <OfferCard
+                  offer={offer}
+                  idToken={idToken}
+                  onDispatched={(id) =>
+                    setOffers((prev) =>
+                      prev.map((o) =>
+                        o.id === id ? { ...o, dispatched_at: new Date().toISOString() } : o
+                      )
                     )
-                  )
-                }
-              />
+                  }
+                />
+              </div>
             ))}
           </div>
         )}
@@ -205,6 +239,7 @@ export default function OffersPage() {
           onClose={() => setShowAddModal(false)}
           onJobStarted={(jobId) => setActiveJobId(jobId)}
           extractionResult={extractionResult}
+          onScrollToOffer={handleScrollToOffer}
         />
       )}
     </div>

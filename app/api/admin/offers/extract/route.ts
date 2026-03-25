@@ -13,6 +13,28 @@ async function runExtraction(jobId: string, url: string) {
     slug = parsed.pathname.split("/").filter(Boolean)[0];
     if (!slug) throw new Error("Empty slug");
 
+    // Check if offer already exists in the collection
+    const existingDoc = await adminDb.collection("offers").doc(slug).get();
+    if (existingDoc.exists) {
+      const d = existingDoc.data()!;
+      const toIso = (v: unknown) =>
+        v && typeof (v as { toDate?: () => Date }).toDate === "function"
+          ? (v as { toDate: () => Date }).toDate().toISOString()
+          : (v ?? null);
+      await jobRef.update({
+        status: "conflict",
+        slug,
+        existingOffer: {
+          id: slug,
+          ...d,
+          scrapped_at: toIso(d.scrapped_at),
+          dispatched_at: toIso(d.dispatched_at),
+          expiration_datetime: toIso(d.expiration_datetime),
+        },
+      });
+      return;
+    }
+
     const docData = {
       trigger: "manual" as const,
       name: product.name,
