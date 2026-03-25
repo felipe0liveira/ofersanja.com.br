@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
 import { adminDb } from "@/lib/firebase-admin";
 import { scrapeMlProduct, isShortUrl, resolveProductSlug, normalizeSlug } from "@/lib/scraper/ml-product";
+import { createAffiliateLink } from "@/lib/affiliate/ml-create-link";
 
 async function runExtraction(jobId: string, url: string) {
   const jobRef = adminDb.collection("extraction_jobs").doc(jobId);
@@ -36,7 +37,8 @@ async function runExtraction(jobId: string, url: string) {
       trigger: "manual" as const,
       name: product.name,
       image: product.image,
-      link: product.product_link,
+      link: await createAffiliateLink(product.product_link),
+      product_link: product.product_link,
       price: product.price,
       old_price: product.old_price,
       coupon: product.coupon,

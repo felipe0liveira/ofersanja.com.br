@@ -29,7 +29,7 @@ function buildWhatsAppText(offer: Offer): string {
   // if (offer.time_limited) lines.push("⏳ Oferta por tempo limitado!");
 
   lines.push("");
-  lines.push(`🔗 ${offer.link}`);
+  lines.push(`🔗 ${offer.link ?? offer.product_link}`);
 
   return lines.join("\n");
 }

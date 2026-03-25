@@ -8,7 +8,8 @@ type PublicOffer = {
   id: string;
   name: string;
   image: string;
-  link: string;
+  link: string | null;
+  product_link: string;
   price: number;
   old_price: number;
   coupon: boolean;
@@ -166,7 +167,7 @@ export function OfferCarousel() {
                       </span>
                     </div>
                     <a
-                      href={offer.link}
+                      href={offer.link ?? offer.product_link}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 mt-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold py-2 rounded-xl transition-colors"

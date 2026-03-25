@@ -2,7 +2,8 @@ export type Offer = {
   id: string;
   name: string;
   image: string;
-  link: string;
+  link: string | null;
+  product_link: string;
   price: number;
   old_price: number;
   coupon: boolean;
