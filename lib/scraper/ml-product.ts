@@ -1,4 +1,8 @@
 import { chromium } from "playwright-core";
+import fs from "fs/promises";
+import path from "path";
+
+const SCRAPER_DEBUG = process.env.SCRAPER_DEBUG === "true";
 
 export type MlProductData = {
   name: string;
@@ -98,6 +102,21 @@ function parseMoneyLabel(label: string): number {
   return parseFloat(`${reais}.${String(centavos).padStart(2, "0")}`);
 }
 
+async function debugScreenshot(
+  page: import("playwright-core").Page,
+  label: string
+): Promise<void> {
+  if (!SCRAPER_DEBUG) return;
+  try {
+    const filename = `scraper-${Date.now()}-${label.replace(/[^a-z0-9]/gi, "_")}.png`;
+    const filepath = path.join("/tmp", filename);
+    await page.screenshot({ path: filepath, fullPage: true });
+    console.log(`[scraper] screenshot saved: ${filepath}`);
+  } catch (e) {
+    console.warn(`[scraper] screenshot failed: ${e}`);
+  }
+}
+
 export async function scrapeMlProduct(url: string): Promise<MlProductData> {
   const browser = await chromium.launch({
     executablePath: EXECUTABLE_PATH,
@@ -166,9 +185,15 @@ export async function scrapeMlProduct(url: string): Promise<MlProductData> {
     }
   }
   if (lastError) {
+    await debugScreenshot(page, "nav-error");
     await browser.close();
     throw lastError;
   }
+
+  // ── Diagnostic logging ────────────────────────────────────────────────────
+  const diagTitle = await page.title();
+  const diagUrl = page.url();
+  console.log(`[scraper] nav done — title="${diagTitle}" url="${diagUrl}"`);
 
   // Post-load wait + gradual scroll to trigger lazy content
   await page.waitForTimeout(2_000);
@@ -180,6 +205,24 @@ export async function scrapeMlProduct(url: string): Promise<MlProductData> {
   }
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
+
+  // ── Fail-fast: verify the product page actually loaded ────────────────────
+  const titleCount = await page.locator("h1.ui-pdp-title").count();
+  if (titleCount === 0) {
+    const bodySnippet = await page.evaluate(
+      () => document.body?.innerText?.slice(0, 500) ?? ""
+    );
+    console.error(
+      `[scraper] product page not found — title="${diagTitle}" url="${diagUrl}" body="${bodySnippet}"`
+    );
+    await debugScreenshot(page, "blocked");
+    await browser.close();
+    throw new Error(
+      `ML page did not load product. title="${diagTitle}" url="${diagUrl}"`
+    );
+  }
+
+  await debugScreenshot(page, "loaded");
 
   // ── Extraction ────────────────────────────────────────────────────────────
 
