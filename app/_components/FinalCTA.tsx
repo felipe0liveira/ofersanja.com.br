@@ -33,7 +33,7 @@ export function FinalCTA() {
           Mais de 1.000 pessoas já estão economizando todos os dias. Junte-se ao grupo agora — é grátis e você pode sair quando quiser.
         </p>
 
-        <WhatsAppButton size="lg" label="🚀 Quero entrar no grupo VIP" />
+        <WhatsAppButton size="lg" label="Quero entrar no grupo VIP" />
 
         <p className="text-slate-500 text-xs">Sem spam. Só ofertas de verdade.</p>
       </motion.div>
