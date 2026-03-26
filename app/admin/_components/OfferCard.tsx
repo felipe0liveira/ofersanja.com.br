@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useState } from "react";
-import { Tag, Star, Clock, Copy, Check, Send } from "lucide-react";
+import { Tag, Star, Copy, Check, Send } from "lucide-react";
 import type { Offer } from "@/lib/types/offer";
 
 function formatBRL(value: number) {
@@ -29,7 +29,7 @@ function buildWhatsAppText(offer: Offer): string {
   // if (offer.time_limited) lines.push("⏳ Oferta por tempo limitado!");
 
   lines.push("");
-  lines.push(`🔗 ${offer.link ?? offer.product_link}`);
+  lines.push(`🔗 ${offer.link ?? offer.source_link}`);
 
   return lines.join("\n");
 }
@@ -156,16 +156,6 @@ export function OfferCard({
         {discount !== null && discount > 0 && (
           <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
             -{discount}%
-          </span>
-        )}
-        {offer.time_limited && (
-          <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Limitado
-          </span>
-        )}
-        {offer.trigger === "manual" && (
-          <span className="absolute bottom-2 left-2 bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-            Manual
           </span>
         )}
       </div>

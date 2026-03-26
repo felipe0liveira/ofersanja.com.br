@@ -1,56 +1,26 @@
 import type { NextRequest } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import type { Offer } from "@/lib/types/offer";
+import { verifyBffToken } from "@/lib/verify-bff-token";
+
+const BACKEND_API_URL = process.env.BACKEND_API_URL!;
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization");
-  const idToken = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : null;
-
-  if (!idToken) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    await adminAuth.verifyIdToken(idToken);
-  } catch {
-    return Response.json({ error: "Invalid or expired token" }, { status: 401 });
-  }
+  const auth = await verifyBffToken(request);
+  if (!auth.ok) return auth.response;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const snapshot = await adminDb
-    .collection("offers")
-    .where("scrapped_at", ">=", todayStart)
-    .orderBy("scrapped_at", "desc")
-    .get();
-
-  const offers: Offer[] = snapshot.docs
-    .map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      image: data.image,
-      link: data.link ?? null,
-      product_link: data.product_link ?? "",
-      price: data.price,
-      old_price: data.old_price,
-      coupon: data.coupon,
-      coupon_description: data.coupon_description ?? "",
-      coupon_price: data.coupon_price,
-      trigger: (data.trigger ?? null) as "manual" | "automatic" | null,
-      price_with_coupon: data.price_with_coupon,
-      seller: data.seller,
-      rating: data.rating,
-      time_limited: data.time_limited,
-      expiration_datetime: data.expiration_datetime?.toDate().toISOString() ?? null,
-      scrapped_at: data.scrapped_at?.toDate().toISOString() ?? null,
-      dispatched_at: data.dispatched_at?.toDate().toISOString() ?? null,
-    };
-  });
-
-  return Response.json({ offers });
+  try {
+    const res = await fetch(
+      `${BACKEND_API_URL}/offers/?extractedAfterCopy=${todayStart.toISOString()}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) {
+      return Response.json({ error: "Backend error" }, { status: 502 });
+    }
+    const offers = await res.json();
+    return Response.json({ offers });
+  } catch {
+    return Response.json({ error: "Failed to reach backend" }, { status: 502 });
+  }
 }

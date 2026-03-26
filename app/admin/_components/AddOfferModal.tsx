@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { X, Link, Loader2, AlertCircle, Tag, Star, PackageSearch } from "lucide-react";
+import { X, Link, Loader2, AlertCircle, CheckCircle, PackageSearch } from "lucide-react";
 import type { Offer } from "@/lib/types/offer";
 
 function formatBRL(value: number) {
@@ -21,7 +21,7 @@ export function AddOfferModal({
   idToken: string;
   onClose: () => void;
   onJobStarted: (jobId: string) => void;
-  extractionResult?: { offer: Offer } | { error: string } | { conflict: Offer } | null;
+  extractionResult?: { done: true } | { error: string } | { conflict: Offer | null } | null;
   onScrollToOffer: (offerId: string) => void;
 }) {
   const [step, setStep] = useState<Step>("input");
@@ -33,8 +33,7 @@ export function AddOfferModal({
   // React to extraction result coming from the parent (page-level polling)
   useEffect(() => {
     if (!extractionResult || step !== "extracting") return;
-    if ("offer" in extractionResult) {
-      setOffer(extractionResult.offer);
+    if ("done" in extractionResult) {
       setStep("result");
     } else if ("conflict" in extractionResult) {
       setOffer(extractionResult.conflict);
@@ -60,11 +59,6 @@ export function AddOfferModal({
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
-      if (res.status === 409 && data.conflict) {
-        setOffer(data.offer as Offer);
-        setStep("conflict");
-        return;
-      }
       if (!res.ok) {
         setErrorMsg(data?.error ?? "Erro ao iniciar extração.");
         setStep("error");
@@ -85,15 +79,6 @@ export function AddOfferModal({
     setStep("input");
     setTimeout(() => inputRef.current?.focus(), 50);
   }
-
-  const discount =
-    offer && offer.old_price > 0 && offer.old_price > offer.price
-      ? Math.round(((offer.old_price - offer.price) / offer.old_price) * 100)
-      : null;
-  const finalPrice =
-    offer && offer.coupon && offer.price_with_coupon > 0
-      ? offer.price_with_coupon
-      : offer?.price;
 
   return (
     <div
@@ -174,29 +159,31 @@ export function AddOfferModal({
           )}
 
           {/* ── Conflict step ── */}
-          {step === "conflict" && offer && (
+          {step === "conflict" && (
             <div className="flex flex-col gap-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 flex flex-col items-center gap-2 text-center">
                 <PackageSearch className="w-8 h-8 text-amber-500" />
                 <p className="text-sm font-semibold text-amber-800">Produto já está na lista!</p>
                 <p className="text-xs text-amber-600">Este produto já foi adicionado às ofertas de hoje.</p>
               </div>
-              <div className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
-                <div className="relative w-16 h-16 shrink-0 bg-gray-50 rounded-lg overflow-hidden">
-                  <Image
-                    src={offer.image}
-                    alt={offer.name}
-                    fill
-                    className="object-contain p-1"
-                    sizes="64px"
-                    unoptimized
-                  />
+              {offer && (
+                <div className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
+                  <div className="relative w-16 h-16 shrink-0 bg-gray-50 rounded-lg overflow-hidden">
+                    <Image
+                      src={offer.image}
+                      alt={offer.name}
+                      fill
+                      className="object-contain p-1"
+                      sizes="64px"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <p className="text-xs font-medium text-gray-800 line-clamp-2 leading-snug">{offer.name}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatBRL(offer.price)}</p>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <p className="text-xs font-medium text-gray-800 line-clamp-2 leading-snug">{offer.name}</p>
-                  <p className="text-sm font-bold text-gray-900">{formatBRL(offer.price)}</p>
-                </div>
-              </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleReset}
@@ -204,12 +191,14 @@ export function AddOfferModal({
                 >
                   Adicionar outro
                 </button>
-                <button
-                  onClick={() => onScrollToOffer(offer.id)}
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
-                >
-                  Ver produto
-                </button>
+                {offer && (
+                  <button
+                    onClick={() => onScrollToOffer(offer.id)}
+                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                  >
+                    Ver produto
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -229,67 +218,16 @@ export function AddOfferModal({
           )}
 
           {/* ── Result step ── */}
-          {step === "result" && offer && (
-            <div className="flex flex-col gap-4">
-              {/* Product card */}
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                {/* Image */}
-                <div className="relative h-48 bg-gray-50 flex items-center justify-center">
-                  <Image
-                    src={offer.image}
-                    alt={offer.name}
-                    fill
-                    className="object-contain p-4"
-                    sizes="448px"
-                    unoptimized
-                  />
-                  {discount !== null && discount > 0 && (
-                    <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      -{discount}%
-                    </span>
-                  )}
-                  {offer.coupon && (
-                    <span className="absolute top-2 right-2 bg-amber-400 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      🏷️ Cupom
-                    </span>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="p-4 flex flex-col gap-2">
-                  <p className="text-sm font-semibold text-gray-800 line-clamp-3 leading-snug">
-                    {offer.name}
-                  </p>
-
-                  <div className="flex flex-col gap-0.5">
-                    {offer.old_price > 0 && offer.old_price > offer.price && (
-                      <span className="text-xs text-gray-400 line-through">{formatBRL(offer.old_price)}</span>
-                    )}
-                    <span className="text-lg font-bold text-gray-900">{formatBRL(finalPrice!)}</span>
-                    {offer.coupon && offer.price_with_coupon > 0 && (
-                      <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
-                        <Tag className="w-3 h-3" />
-                        {offer.coupon_description || "Cupom disponível"}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
-                    {offer.seller && (
-                      <span>🏪 <span className="font-medium">{offer.seller}</span></span>
-                    )}
-                    {offer.rating && (
-                      <span className="flex items-center gap-1">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        {offer.rating}
-                      </span>
-                    )}
-                  </div>
-                </div>
+          {step === "result" && (
+            <div className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
+                <CheckCircle className="w-7 h-7 text-emerald-600" />
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-2">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Oferta adicionada!</p>
+                <p className="text-xs text-gray-500 mt-1">A oferta foi extraída e está na lista.</p>
+              </div>
+              <div className="flex gap-2 w-full">
                 <button
                   onClick={handleReset}
                   className="flex-1 border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-medium py-2.5 rounded-xl transition-colors"
@@ -300,7 +238,7 @@ export function AddOfferModal({
                   onClick={onClose}
                   className="flex-1 bg-blue-950 hover:bg-blue-900 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
                 >
-                  Concluir
+                  Fechar
                 </button>
               </div>
             </div>

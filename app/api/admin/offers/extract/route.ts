@@ -1,72 +1,7 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
-import { adminDb } from "@/lib/firebase-admin";
-import { scrapeMlProduct, isShortUrl, resolveProductSlug, normalizeSlug } from "@/lib/scraper/ml-product";
-import { createAffiliateLink } from "@/lib/affiliate/ml-create-link";
 
-async function runExtraction(jobId: string, url: string) {
-  const jobRef = adminDb.collection("extraction_jobs").doc(jobId);
-  try {
-    // For short URLs: resolve to canonical URL first, extract slug, check for
-    // conflict before paying the cost of a full page scrape.
-    if (isShortUrl(url)) {
-      const earlySlug = await resolveProductSlug(url);
-      const existingDoc = await adminDb.collection("offers").doc(earlySlug).get();
-      if (existingDoc.exists) {
-        await jobRef.update({ status: "conflict", slug: earlySlug });
-        return;
-      }
-    }
-
-    const product = await scrapeMlProduct(url);
-
-    let slug: string;
-    const parsed = new URL(product.product_link);
-    const rawSlug = parsed.pathname.split("/").filter(Boolean)[0];
-    slug = normalizeSlug(rawSlug);
-    if (!slug) throw new Error("Empty slug");
-
-    // Check if offer already exists in the collection
-    const existingDoc = await adminDb.collection("offers").doc(slug).get();
-    if (existingDoc.exists) {
-      await jobRef.update({ status: "conflict", slug });
-      return;
-    }
-
-    const docData = {
-      trigger: "manual" as const,
-      name: product.name,
-      image: product.image,
-      link: await createAffiliateLink(product.product_link),
-      product_link: product.product_link,
-      price: product.price,
-      old_price: product.old_price,
-      coupon: product.coupon,
-      coupon_description: product.coupon_description,
-      coupon_price: 0,
-      price_with_coupon: product.price_with_coupon,
-      seller: product.seller,
-      rating: product.rating,
-      time_limited: false,
-      expiration_datetime: null,
-      scrapped_at: product.scrapped_at,
-      dispatched_at: null,
-    };
-
-    await adminDb.collection("offers").doc(slug).set(docData, { merge: true });
-
-    await jobRef.update({
-      status: "done",
-      slug,
-    });
-  } catch (err) {
-    console.error(`[extraction:${jobId}] failed:`, err);
-    await jobRef.update({
-      status: "error",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
-  }
-}
+const BACKEND_API_URL = process.env.BACKEND_API_URL!;
 
 export async function POST(request: NextRequest) {
   const auth = await verifyBffToken(request);
@@ -81,60 +16,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const isMl = url.includes("mercadolivre.com.br") || url.includes("meli.la") || url.includes("mercadolivre.page.link");
-  if (!isMl) {
-    return Response.json(
-      { error: "URL must be from mercadolivre.com.br or meli.la" },
-      { status: 400 }
-    );
-  }
-
-  // Early synchronous conflict check — only possible for direct ML URLs where the
-  // slug is already visible in the path (short URLs need scraping first)
-  if (!isShortUrl(url)) {
-    try {
-      const parsed = new URL(url);
-      const candidateSlug = normalizeSlug(parsed.pathname.split("/").filter(Boolean)[0] ?? "");
-      if (candidateSlug) {
-        const existingDoc = await adminDb.collection("offers").doc(candidateSlug).get();
-        if (existingDoc.exists) {
-          const d = existingDoc.data()!;
-          const toIso = (v: unknown) =>
-            v && typeof (v as { toDate?: () => Date }).toDate === "function"
-              ? (v as { toDate: () => Date }).toDate().toISOString()
-              : (v ?? null);
-          return Response.json(
-            {
-              conflict: true,
-              offer: {
-                id: candidateSlug,
-                ...d,
-                scrapped_at: toIso(d.scrapped_at),
-                dispatched_at: toIso(d.dispatched_at),
-                expiration_datetime: toIso(d.expiration_datetime),
-              },
-            },
-            { status: 409 }
-          );
-        }
-      }
-    } catch {
-      // Malformed URL — let the scraper handle it and fail naturally
+  try {
+    const res = await fetch(`${BACKEND_API_URL}/offers/extract`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return Response.json({ error: data?.error ?? "Backend error" }, { status: res.status });
     }
+    // Backend returns { job_id, slug } — normalize to camelCase for the client
+    return Response.json({ jobId: data.job_id, slug: data.slug }, { status: 202 });
+  } catch {
+    return Response.json({ error: "Failed to reach backend" }, { status: 502 });
   }
-
-  const jobId = crypto.randomUUID();
-
-  await adminDb.collection("extraction_jobs").doc(jobId).set({
-    status: "extracting",
-    slug: null,
-    error: null,
-    createdAt: new Date(),
-  });
-
-  // Fire and forget — response is returned immediately
-  runExtraction(jobId, url);
-
-  return Response.json({ jobId }, { status: 202 });
 }
 

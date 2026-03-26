@@ -21,7 +21,7 @@ export default function OffersPage() {
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [extractionResult, setExtractionResult] = useState<{ offer: Offer } | { error: string } | { conflict: Offer } | null>(null);
+  const [extractionResult, setExtractionResult] = useState<{ done: true } | { error: string } | { conflict: Offer | null } | null>(null);
   const [highlightedOfferId, setHighlightedOfferId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
@@ -36,6 +36,11 @@ export default function OffersPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const handleJobStarted = useCallback((jobId: string) => {
+    setActiveJobId(jobId);
+    localStorage.setItem("activeJobId", jobId);
+  }, []);
+
   // Page-level polling — continues even when the modal is closed
   useEffect(() => {
     if (!activeJobId || !idToken) return;
@@ -44,29 +49,34 @@ export default function OffersPage() {
         const res = await fetch(`/api/admin/offers/extract/${activeJobId}/status`, {
           headers: { Authorization: `Bearer ${idToken}` },
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 404) {
+            clearInterval(interval);
+            setActiveJobId(null);
+            localStorage.removeItem("activeJobId");
+          }
+          return;
+        }
         const data = await res.json();
         if (data.status === "done") {
           clearInterval(interval);
-          const newOffer = data.offer as Offer;
-          setOffers((prev) =>
-            prev.some((o) => o.id === newOffer.id)
-              ? prev.map((o) => (o.id === newOffer.id ? newOffer : o))
-              : [newOffer, ...prev]
-          );
-          setExtractionResult({ offer: newOffer });
           setActiveJobId(null);
+          localStorage.removeItem("activeJobId");
+          const r = await fetch("/api/admin/offers", { headers: { Authorization: `Bearer ${idToken}` } });
+          if (r.ok) { const d = await r.json(); setOffers(d.offers ?? []); }
+          setExtractionResult({ done: true });
           if (!showAddModalRef.current) addToast("success", "Extração finalizada com sucesso!");
         } else if (data.status === "conflict") {
           clearInterval(interval);
-          const existing = data.offer as Offer;
-          setExtractionResult({ conflict: existing });
           setActiveJobId(null);
+          localStorage.removeItem("activeJobId");
+          setExtractionResult({ conflict: null });
           if (!showAddModalRef.current) addToast("warning", "Oferta já existente.");
         } else if (data.status === "error") {
           clearInterval(interval);
-          setExtractionResult({ error: data.error ?? "Falha ao extrair produto." });
           setActiveJobId(null);
+          localStorage.removeItem("activeJobId");
+          setExtractionResult({ error: data.details ?? "Falha ao extrair produto." });
           if (!showAddModalRef.current) addToast("error", "Erro na extração.");
         }
       } catch {
@@ -76,17 +86,11 @@ export default function OffersPage() {
     return () => clearInterval(interval);
   }, [activeJobId, idToken]);
 
-  // On mount: recover any in-progress extraction job and resume polling
+  // On mount: recover any in-progress extraction job from localStorage and resume polling
   useEffect(() => {
     if (!idToken) return;
-    fetch("/api/admin/offers/extract/active", {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.jobId) setActiveJobId(d.jobId);
-      })
-      .catch(() => {/* ignore — non-critical */});
+    const savedJobId = localStorage.getItem("activeJobId");
+    if (savedJobId) setActiveJobId(savedJobId);
   }, [idToken]);
 
   useEffect(() => {
@@ -296,7 +300,7 @@ export default function OffersPage() {
         <AddOfferModal
           idToken={idToken}
           onClose={() => setShowAddModal(false)}
-          onJobStarted={(jobId) => setActiveJobId(jobId)}
+          onJobStarted={handleJobStarted}
           extractionResult={extractionResult}
           onScrollToOffer={handleScrollToOffer}
         />
