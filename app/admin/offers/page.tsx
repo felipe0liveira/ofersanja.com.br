@@ -21,7 +21,7 @@ export default function OffersPage() {
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [extractionResult, setExtractionResult] = useState<{ done: true } | { error: string } | { conflict: Offer | null } | null>(null);
+  const [extractionResult, setExtractionResult] = useState<{ done: true } | { error: string } | null>(null);
   const [highlightedOfferId, setHighlightedOfferId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
@@ -58,7 +58,7 @@ export default function OffersPage() {
           return;
         }
         const data = await res.json();
-        if (data.status === "done") {
+        if (data.status === "success") {
           clearInterval(interval);
           setActiveJobId(null);
           localStorage.removeItem("activeJobId");
@@ -66,12 +66,6 @@ export default function OffersPage() {
           if (r.ok) { const d = await r.json(); setOffers(d.offers ?? []); }
           setExtractionResult({ done: true });
           if (!showAddModalRef.current) addToast("success", "Extração finalizada com sucesso!");
-        } else if (data.status === "conflict") {
-          clearInterval(interval);
-          setActiveJobId(null);
-          localStorage.removeItem("activeJobId");
-          setExtractionResult({ conflict: null });
-          if (!showAddModalRef.current) addToast("warning", "Oferta já existente.");
         } else if (data.status === "error") {
           clearInterval(interval);
           setActiveJobId(null);
@@ -302,7 +296,6 @@ export default function OffersPage() {
           onClose={() => setShowAddModal(false)}
           onJobStarted={handleJobStarted}
           extractionResult={extractionResult}
-          onScrollToOffer={handleScrollToOffer}
         />
       )}
 
