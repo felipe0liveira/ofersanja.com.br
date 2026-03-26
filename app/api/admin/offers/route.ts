@@ -18,8 +18,9 @@ export async function GET(request: NextRequest) {
     if (!res.ok) {
       return Response.json({ error: "Backend error" }, { status: 502 });
     }
-    const offers = await res.json();
-    return Response.json({ offers });
+    const body = await res.json();
+    const offers = Array.isArray(body) ? body : (body.data ?? []);
+    return Response.json({ offers, pagination: body.pagination ?? null });
   } catch {
     return Response.json({ error: "Failed to reach backend" }, { status: 502 });
   }
