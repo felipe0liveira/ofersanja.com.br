@@ -5,7 +5,7 @@ import Image from "next/image";
 import { signOut, type User } from "firebase/auth";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, LayoutDashboard, ShoppingBag, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, ShoppingBag, Users, BriefcaseBusiness } from "lucide-react";
 import { auth } from "@/lib/firebase";
 
 export function AdminHeader({ user, roles }: { user: User; roles: string[] }) {
@@ -71,6 +71,11 @@ export function AdminHeader({ user, roles }: { user: User; roles: string[] }) {
               Usuários
             </Link>
           )}
+          {isAdmin && (
+            <Link href="/admin/jobs" className={navClass("/admin/jobs")}>
+              Jobs
+            </Link>
+          )}
         </nav>
       </div>
 
@@ -116,6 +121,11 @@ export function AdminHeader({ user, roles }: { user: User; roles: string[] }) {
               {isAdmin && (
                 <Link href="/admin/users" className={menuLinkClass("/admin/users")}>
                   <Users className="w-4 h-4" /> Usuários
+                </Link>
+              )}
+              {isAdmin && (
+                <Link href="/admin/jobs" className={menuLinkClass("/admin/jobs")}>
+                  <BriefcaseBusiness className="w-4 h-4" /> Jobs
                 </Link>
               )}
             </div>
