@@ -63,6 +63,7 @@ steps:
       - '--min-instances=0'
       - '--max-instances=1'
       - '--concurrency=80'
+      - '--set-env-vars=BACKEND_API_URL=$_BACKEND_API_URL'
       - '--set-secrets'
       - 'ML_AFFILIATE_SSID=mercadolivre-ssid:latest'
       - '--quiet'
@@ -86,6 +87,7 @@ substitutions:
   _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'ofersanja.firebasestorage.app'
   _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '843065097069'
   _NEXT_PUBLIC_FIREBASE_APP_ID: '1:843065097069:web:63621e9d078f21abe87864'
+  _BACKEND_API_URL: 'https://api.ofersanja.com.br'
 
 tags:
   - github
