@@ -4,4 +4,5 @@ export type ExtractionJob = {
   created_at: string;
   status: string;
   details: string | null;
+  screenshot: boolean;
 };

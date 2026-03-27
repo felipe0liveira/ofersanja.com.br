@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { BriefcaseBusiness, RefreshCw } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { useJobs } from "../_hooks/useJobs";
 import { AdminHeader } from "../_components/AdminHeader";
+import { JobErrorModal } from "../_components/JobErrorModal";
+import type { ExtractionJob } from "@/lib/types/extraction-job";
 
 const STATUS_LABEL: Record<string, string> = {
   "checking-affiliate-link": "Verificando link",
@@ -44,6 +47,7 @@ export default function JobsPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
   const isAdmin = roles.includes("admin");
   const { jobs, loading, loadingMore, refreshing, sentinelRef, handleRefresh } = useJobs(idToken, isAdmin);
+  const [selectedJob, setSelectedJob] = useState<ExtractionJob | null>(null);
 
   if (checking) {
     return (
@@ -115,15 +119,20 @@ export default function JobsPage() {
                     {job.slug && (
                       <p className="text-sm font-medium text-gray-800 truncate mt-0.5">{job.slug}</p>
                     )}
-                    {job.details && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{job.details}</p>
-                    )}
                   </div>
 
-                  {/* Status + date */}
+                  {/* Status + date + action */}
                   <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
                     <StatusBadge status={job.status} />
                     <span className="text-xs text-gray-400">{formatDate(job.created_at)}</span>
+                    {job.status === "error" && (
+                      <button
+                        onClick={() => setSelectedJob(job)}
+                        className="text-xs text-red-600 hover:text-red-800 underline underline-offset-2 transition-colors"
+                      >
+                        Ver detalhes
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -141,6 +150,14 @@ export default function JobsPage() {
         {/* Scroll sentinel */}
         <div ref={sentinelRef} className="h-1" />
       </main>
+
+      {selectedJob && (
+        <JobErrorModal
+          job={selectedJob}
+          idToken={idToken ?? ""}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
     </div>
   );
 }
