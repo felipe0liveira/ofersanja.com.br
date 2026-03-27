@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { Users, Plus, Trash2, Check, X, Edit2 } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
+import { useUsers } from "../_hooks/useUsers";
 import { AdminHeader } from "../_components/AdminHeader";
 import type { AdminUser } from "@/lib/types/admin-user";
 
@@ -25,91 +26,24 @@ function RoleBadge({ role }: { role: string }) {
 
 export default function UsersPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { users, loading, addLoading, addError, setAddError, handleAdd, handleSaveRoles, handleDelete } = useUsers(idToken);
 
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newRoles, setNewRoles] = useState<string[]>(["manager"]);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [addLoading, setAddLoading] = useState(false);
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRoles, setEditRoles] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const isAdmin = roles.includes("admin");
 
-  useEffect(() => {
-    if (!idToken) return;
-    setLoading(true);
-    fetch("/api/admin/users", {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setUsers(d.users ?? []))
-      .finally(() => setLoading(false));
-  }, [idToken]);
-
-  async function handleAdd() {
-    setAddError(null);
-    setAddLoading(true);
-    try {
-      const res = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ email: newEmail, roles: newRoles }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAddError(data.error ?? "Erro ao criar usuário.");
-        return;
-      }
-      setUsers((prev) => [
-        ...prev,
-        {
-          id: data.id,
-          uid: null,
-          email: newEmail.trim().toLowerCase(),
-          name: null,
-          photo: null,
-          roles: newRoles,
-          lastLoginAt: null,
-        },
-      ]);
+  async function handleAddSubmit() {
+    const ok = await handleAdd(newEmail, newRoles);
+    if (ok) {
       setNewEmail("");
       setNewRoles(["manager"]);
       setShowAdd(false);
-    } finally {
-      setAddLoading(false);
     }
-  }
-
-  async function handleSaveRoles(id: string) {
-    await fetch(`/api/admin/users/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ roles: editRoles }),
-    });
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, roles: editRoles } : u))
-    );
-    setEditingId(null);
-  }
-
-  async function handleDelete(id: string) {
-    await fetch(`/api/admin/users/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    setDeleteConfirmId(null);
   }
 
   if (checking) {
@@ -156,7 +90,7 @@ export default function UsersPage() {
                 placeholder="email@exemplo.com"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                onKeyDown={(e) => e.key === "Enter" && handleAddSubmit()}
                 className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-950"
               />
               <div className="flex items-center gap-4">
@@ -178,7 +112,7 @@ export default function UsersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleAdd}
+                  onClick={handleAddSubmit}
                   disabled={addLoading || !newEmail.trim()}
                   className="flex items-center gap-1.5 text-sm bg-blue-950 hover:bg-blue-900 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >
@@ -263,7 +197,7 @@ export default function UsersPage() {
                                 {r}
                               </label>
                             ))}
-                            <button onClick={() => handleSaveRoles(u.id)} className="text-green-600 hover:text-green-700">
+                            <button onClick={() => handleSaveRoles(u.id, editRoles).then(() => setEditingId(null))} className="text-green-600 hover:text-green-700">
                               <Check className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => setEditingId(null)} className="text-gray-400 hover:text-gray-600">
@@ -288,7 +222,7 @@ export default function UsersPage() {
                         {deleteConfirmId === u.id ? (
                           <div className="flex flex-col gap-1 items-end">
                             <button
-                              onClick={() => handleDelete(u.id)}
+                              onClick={() => handleDelete(u.id).then(() => setDeleteConfirmId(null))}
                               className="text-xs text-red-600 font-medium hover:underline"
                             >
                               Confirmar
@@ -389,7 +323,7 @@ export default function UsersPage() {
                             </label>
                           ))}
                           <button
-                            onClick={() => handleSaveRoles(u.id)}
+                          onClick={() => handleSaveRoles(u.id, editRoles).then(() => setEditingId(null))}
                             className="text-green-600 hover:text-green-700 ml-1"
                             title="Salvar"
                           >
@@ -424,7 +358,7 @@ export default function UsersPage() {
                           {deleteConfirmId === u.id ? (
                             <>
                               <button
-                                onClick={() => handleDelete(u.id)}
+                                onClick={() => handleDelete(u.id).then(() => setDeleteConfirmId(null))}
                                 className="text-xs text-red-600 font-medium hover:underline"
                               >
                                 Confirmar

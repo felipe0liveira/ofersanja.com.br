@@ -1,65 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
-
-type PublicOffer = {
-  id: string;
-  name: string;
-  image: string;
-  link: string | null;
-  product_link: string;
-  price: number;
-  old_price: number;
-  coupon: boolean;
-  price_with_coupon: number;
-  scrapped_at: string | null;
-};
+import { usePublicOffers } from "../_hooks/usePublicOffers";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function OfferCarousel() {
-  const [offers, setOffers] = useState<PublicOffer[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const { offers, loaded, hasMore, fetchMore } = usePublicOffers();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [visibleCount, setVisibleCount] = useState(1);
   const [offset, setOffset] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const fetchingRef = useRef(false);
-  const hasMoreRef = useRef(true);
-  const cursorRef = useRef<string | null>(null);
 
   useEffect(() => {
     const update = () => setVisibleCount(window.innerWidth >= 768 ? 3 : 1);
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
-
-  const fetchMore = useCallback(async () => {
-    if (fetchingRef.current || !hasMoreRef.current) return;
-    fetchingRef.current = true;
-    try {
-      const url = cursorRef.current
-        ? `/api/offers?cursor=${encodeURIComponent(cursorRef.current)}`
-        : "/api/offers";
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const data = await res.json();
-      setOffers((prev) => [...prev, ...(data.offers ?? [])]);
-      hasMoreRef.current = data.hasMore;
-      setHasMore(data.hasMore);
-      const last: PublicOffer | undefined = data.offers?.[data.offers.length - 1];
-      if (last?.scrapped_at) cursorRef.current = last.scrapped_at;
-    } finally {
-      fetchingRef.current = false;
-      setLoaded(true);
-    }
   }, []);
 
   useEffect(() => {

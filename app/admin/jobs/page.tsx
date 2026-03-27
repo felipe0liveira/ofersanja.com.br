@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { BriefcaseBusiness, RefreshCw } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
+import { useJobs } from "../_hooks/useJobs";
 import { AdminHeader } from "../_components/AdminHeader";
-import type { ExtractionJob } from "@/lib/types/extraction-job";
 
 const STATUS_LABEL: Record<string, string> = {
   "checking-affiliate-link": "Verificando link",
@@ -43,66 +42,8 @@ function formatDate(iso: string | null) {
 
 export default function JobsPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
-  const [jobs, setJobs] = useState<ExtractionJob[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const loadMoreCallbackRef = useRef<() => void>(() => {});
-
   const isAdmin = roles.includes("admin");
-
-  const fetchJobs = useCallback(
-    async (page: number, mode: "initial" | "more" | "refresh") => {
-      if (!idToken) return;
-      if (mode === "initial") setLoading(true);
-      else if (mode === "more") setLoadingMore(true);
-      else setRefreshing(true);
-      try {
-        const res = await fetch(`/api/admin/jobs?page=${page}&limit=20`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const incoming: ExtractionJob[] = data.jobs ?? [];
-        setJobs((prev) => (mode === "more" ? [...prev, ...incoming] : incoming));
-        setCurrentPage(page);
-        setHasMore(data.pagination?.hasNextPage ?? false);
-      } finally {
-        if (mode === "initial") setLoading(false);
-        else if (mode === "more") setLoadingMore(false);
-        else setRefreshing(false);
-      }
-    },
-    [idToken]
-  );
-
-  useEffect(() => {
-    if (!idToken || !isAdmin) return;
-    fetchJobs(1, "initial");
-  }, [idToken, isAdmin, fetchJobs]);
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadMoreCallbackRef.current(); },
-      { rootMargin: "200px" }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, []);
-
-  loadMoreCallbackRef.current = () => {
-    if (hasMore && !loadingMore && !loading) fetchJobs(currentPage + 1, "more");
-  };
-
-  const handleRefresh = useCallback(() => {
-    if (refreshing || loading) return;
-    fetchJobs(1, "refresh");
-  }, [fetchJobs, refreshing, loading]);
+  const { jobs, loading, loadingMore, refreshing, sentinelRef, handleRefresh } = useJobs(idToken, isAdmin);
 
   if (checking) {
     return (

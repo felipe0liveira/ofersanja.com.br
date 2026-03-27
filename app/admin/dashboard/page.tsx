@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useAdminAuth } from "../_hooks/useAdminAuth";
+import { useStats } from "../_hooks/useStats";
+
 import { ShoppingBag, Send, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
-import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
-
-type Stats = {
-  totalToday: number;
-  dispatchedToday: number;
-};
 
 function StatCard({
   icon,
@@ -46,19 +42,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
-  const [stats, setStats] = useState<Stats>({ totalToday: 0, dispatchedToday: 0 });
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!idToken) return;
-    setLoading(true);
-    fetch("/api/admin/stats", {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setStats(d))
-      .finally(() => setLoading(false));
-  }, [idToken]);
+  const { stats, loading } = useStats(idToken);
 
   if (checking) {
     return (
