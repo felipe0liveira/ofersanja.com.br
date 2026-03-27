@@ -19,7 +19,6 @@ export function useOffers(idToken: string) {
   const showAddModalRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreCallbackRef = useRef<() => void>(() => {});
-  const lastStatusRef = useRef<string | null>(null);
   const seenEventIdsRef = useRef<Set<string>>(new Set());
 
   const addToast = useCallback((type: Toast["type"], message: string) => {
@@ -33,10 +32,9 @@ export function useOffers(idToken: string) {
 
   const handleJobStarted = useCallback((jobId: string) => {
     setActiveJobId(jobId);
-    setJobStatus(null);
+    setJobStatus("extracting");
     setJobEvents([]);
     seenEventIdsRef.current = new Set();
-    lastStatusRef.current = null;
     localStorage.setItem("activeJobId", jobId);
     addToast("info", "Processo de extração iniciado");
   }, [addToast]);
@@ -65,53 +63,13 @@ export function useOffers(idToken: string) {
     [idToken]
   );
 
-  // Status polling
-  useEffect(() => {
-    if (!activeJobId || !idToken) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/admin/offers/extract/${activeJobId}/status`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (!res.ok) {
-          if (res.status === 404) {
-            clearInterval(interval);
-            setActiveJobId(null);
-            setJobStatus(null);
-            lastStatusRef.current = null;
-            localStorage.removeItem("activeJobId");
-          }
-          return;
-        }
-        const data = await res.json();
-        const status: string = data.status;
-        setJobStatus(status);
+  // Events polling — appends only new events, derives terminal state
+  const TERMINAL_ERROR_EVENTS = new Set([
+    "scrape_failed",
+    "offer_save_failed",
+    "short_link_resolve_failed",
+  ]);
 
-        if (status !== lastStatusRef.current) {
-          lastStatusRef.current = status;
-        }
-
-        if (status === "success") {
-          clearInterval(interval);
-          setActiveJobId(null);
-          lastStatusRef.current = null;
-          localStorage.removeItem("activeJobId");
-          fetchOffers(1, "refresh");
-          addToast("success", "Oferta salva com sucesso!");
-        } else if (status === "error") {
-          clearInterval(interval);
-          setActiveJobId(null);
-          lastStatusRef.current = null;
-          localStorage.removeItem("activeJobId");
-        }
-      } catch {
-        // network hiccup — keep polling
-      }
-    }, 4_000);
-    return () => clearInterval(interval);
-  }, [activeJobId, idToken, fetchOffers, addToast]);
-
-  // Events polling — appends only new events using seen-ids dedup
   useEffect(() => {
     if (!activeJobId || !idToken) return;
     const interval = setInterval(async () => {
@@ -122,22 +80,39 @@ export function useOffers(idToken: string) {
         if (!res.ok) return;
         const data: JobEvent[] = await res.json();
         const newEvents = data.filter((e) => !seenEventIdsRef.current.has(e.id));
-        if (newEvents.length > 0) {
-          newEvents.forEach((e) => seenEventIdsRef.current.add(e.id));
-          setJobEvents((prev) => {
-            const merged = [...prev, ...newEvents];
-            merged.sort((a, b) =>
-              new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
-            );
-            return merged;
-          });
+        if (newEvents.length === 0) return;
+
+        newEvents.forEach((e) => seenEventIdsRef.current.add(e.id));
+        setJobEvents((prev) => {
+          const merged = [...prev, ...newEvents];
+          merged.sort((a, b) =>
+            new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
+          );
+          return merged;
+        });
+
+        const isCompleted = newEvents.some((e) => e.type === "completed");
+        const isError = newEvents.some((e) => TERMINAL_ERROR_EVENTS.has(e.type));
+
+        if (isCompleted) {
+          clearInterval(interval);
+          setActiveJobId(null);
+          setJobStatus("success");
+          localStorage.removeItem("activeJobId");
+          fetchOffers(1, "refresh");
+          addToast("success", "Oferta salva com sucesso!");
+        } else if (isError) {
+          clearInterval(interval);
+          setActiveJobId(null);
+          setJobStatus("error");
+          localStorage.removeItem("activeJobId");
         }
       } catch {
         // ignore
       }
-    }, 3_000);
+    }, 1_000);
     return () => clearInterval(interval);
-  }, [activeJobId, idToken]);
+  }, [activeJobId, idToken, fetchOffers, addToast]);
 
   // Recover any in-progress extraction job from localStorage on mount
   useEffect(() => {
