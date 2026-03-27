@@ -95,6 +95,36 @@ const EVENT_META: Record<JobEventType, EventMeta> = {
     icon: <XCircle className="w-3.5 h-3.5" />,
     color: "text-red-500",
   },
+  name_extracted: {
+    label: "Nome extraído",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  price_extracted: {
+    label: "Preço extraído",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  old_price_extracted: {
+    label: "Preço original extraído",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  image_extracted: {
+    label: "Imagem extraída",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  rating_extracted: {
+    label: "Avaliação extraída",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  seller_extracted: {
+    label: "Vendedor extraído",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
 };
 
 // ── Status label/color ────────────────────────────────────────────────────────

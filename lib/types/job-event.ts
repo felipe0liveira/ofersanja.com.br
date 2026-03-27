@@ -11,7 +11,13 @@ export type JobEventType =
   | "completed"
   | "short_link_resolve_started"
   | "short_link_resolve_completed"
-  | "short_link_resolve_failed";
+  | "short_link_resolve_failed"
+  | "name_extracted"
+  | "price_extracted"
+  | "old_price_extracted"
+  | "image_extracted"
+  | "rating_extracted"
+  | "seller_extracted";
 
 export type JobEvent = {
   id: string;
