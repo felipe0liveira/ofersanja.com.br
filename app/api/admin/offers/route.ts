@@ -10,11 +10,14 @@ export async function GET(request: NextRequest) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  const { searchParams } = new URL(request.url);
+  const backendUrl = new URL(`${BACKEND_API_URL}/offers/`);
+  backendUrl.searchParams.set("extractedAfterCopy", todayStart.toISOString());
+  if (searchParams.has("page")) backendUrl.searchParams.set("page", searchParams.get("page")!);
+  if (searchParams.has("limit")) backendUrl.searchParams.set("limit", searchParams.get("limit")!);
+
   try {
-    const res = await fetch(
-      `${BACKEND_API_URL}/offers/?extractedAfterCopy=${todayStart.toISOString()}`,
-      { cache: "no-store" }
-    );
+    const res = await fetch(backendUrl.toString(), { cache: "no-store" });
     if (!res.ok) {
       return Response.json({ error: "Backend error" }, { status: 502 });
     }

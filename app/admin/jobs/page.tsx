@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BriefcaseBusiness, RefreshCw } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { AdminHeader } from "../_components/AdminHeader";
@@ -45,23 +45,35 @@ export default function JobsPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
   const [jobs, setJobs] = useState<ExtractionJob[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreCallbackRef = useRef<() => void>(() => {});
 
   const isAdmin = roles.includes("admin");
 
   const fetchJobs = useCallback(
-    async (setLoadingFn: (v: boolean) => void) => {
+    async (page: number, mode: "initial" | "more" | "refresh") => {
       if (!idToken) return;
-      setLoadingFn(true);
+      if (mode === "initial") setLoading(true);
+      else if (mode === "more") setLoadingMore(true);
+      else setRefreshing(true);
       try {
-        const res = await fetch("/api/admin/jobs", {
+        const res = await fetch(`/api/admin/jobs?page=${page}&limit=20`, {
           headers: { Authorization: `Bearer ${idToken}` },
         });
         if (!res.ok) return;
         const data = await res.json();
-        setJobs(data.jobs ?? []);
+        const incoming: ExtractionJob[] = data.jobs ?? [];
+        setJobs((prev) => (mode === "more" ? [...prev, ...incoming] : incoming));
+        setCurrentPage(page);
+        setHasMore(data.pagination?.hasNextPage ?? false);
       } finally {
-        setLoadingFn(false);
+        if (mode === "initial") setLoading(false);
+        else if (mode === "more") setLoadingMore(false);
+        else setRefreshing(false);
       }
     },
     [idToken]
@@ -69,13 +81,28 @@ export default function JobsPage() {
 
   useEffect(() => {
     if (!idToken || !isAdmin) return;
-    fetchJobs(setLoading);
+    fetchJobs(1, "initial");
   }, [idToken, isAdmin, fetchJobs]);
 
-  const handleRefresh = useCallback(async () => {
-    if (refreshing) return;
-    fetchJobs(setRefreshing);
-  }, [refreshing, fetchJobs]);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMoreCallbackRef.current(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  loadMoreCallbackRef.current = () => {
+    if (hasMore && !loadingMore && !loading) fetchJobs(currentPage + 1, "more");
+  };
+
+  const handleRefresh = useCallback(() => {
+    if (refreshing || loading) return;
+    fetchJobs(1, "refresh");
+  }, [fetchJobs, refreshing, loading]);
 
   if (checking) {
     return (
@@ -134,32 +161,44 @@ export default function JobsPage() {
             <p className="text-sm">Nenhum job encontrado.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
-              >
-                {/* ID + slug */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-gray-400 truncate">{job.id}</p>
-                  {job.slug && (
-                    <p className="text-sm font-medium text-gray-800 truncate mt-0.5">{job.slug}</p>
-                  )}
-                  {job.details && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{job.details}</p>
-                  )}
-                </div>
+          <>
+            <div className="flex flex-col gap-3">
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                >
+                  {/* ID + slug */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-mono text-gray-400 truncate">{job.id}</p>
+                    {job.slug && (
+                      <p className="text-sm font-medium text-gray-800 truncate mt-0.5">{job.slug}</p>
+                    )}
+                    {job.details && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{job.details}</p>
+                    )}
+                  </div>
 
-                {/* Status + date */}
-                <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
-                  <StatusBadge status={job.status} />
-                  <span className="text-xs text-gray-400">{formatDate(job.created_at)}</span>
+                  {/* Status + date */}
+                  <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
+                    <StatusBadge status={job.status} />
+                    <span className="text-xs text-gray-400">{formatDate(job.created_at)}</span>
+                  </div>
                 </div>
+              ))}
+            </div>
+            {loadingMore && (
+              <div className="flex flex-col gap-3 mt-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl border border-gray-100 h-20 animate-pulse" />
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
+
+        {/* Scroll sentinel */}
+        <div ref={sentinelRef} className="h-1" />
       </main>
     </div>
   );

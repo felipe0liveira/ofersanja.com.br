@@ -16,7 +16,10 @@ export default function OffersPage() {
   const { user, idToken, roles, checking } = useAdminAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -26,6 +29,8 @@ export default function OffersPage() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
   showAddModalRef.current = showAddModal;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreCallbackRef = useRef<() => void>(() => {});
 
   const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -40,6 +45,30 @@ export default function OffersPage() {
     setActiveJobId(jobId);
     localStorage.setItem("activeJobId", jobId);
   }, []);
+
+  const fetchOffers = useCallback(
+    async (page: number, mode: "initial" | "more" | "refresh") => {
+      if (mode === "initial") setLoadingOffers(true);
+      else if (mode === "more") setLoadingMore(true);
+      else setRefreshing(true);
+      try {
+        const res = await fetch(`/api/admin/offers?page=${page}&limit=12`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const incoming: Offer[] = data.offers ?? [];
+        setOffers((prev) => (mode === "more" ? [...prev, ...incoming] : incoming));
+        setCurrentPage(page);
+        setHasMore(data.pagination?.hasNextPage ?? false);
+      } finally {
+        if (mode === "initial") setLoadingOffers(false);
+        else if (mode === "more") setLoadingMore(false);
+        else setRefreshing(false);
+      }
+    },
+    [idToken]
+  );
 
   // Page-level polling — continues even when the modal is closed
   useEffect(() => {
@@ -62,8 +91,7 @@ export default function OffersPage() {
           clearInterval(interval);
           setActiveJobId(null);
           localStorage.removeItem("activeJobId");
-          const r = await fetch("/api/admin/offers", { headers: { Authorization: `Bearer ${idToken}` } });
-          if (r.ok) { const d = await r.json(); setOffers(d.offers ?? []); }
+          fetchOffers(1, "refresh");
           setExtractionResult({ done: true });
           if (!showAddModalRef.current) addToast("success", "Extração finalizada com sucesso!");
         } else if (data.status === "error") {
@@ -78,7 +106,7 @@ export default function OffersPage() {
       }
     }, 5_000);
     return () => clearInterval(interval);
-  }, [activeJobId, idToken]);
+  }, [activeJobId, idToken, fetchOffers, addToast]);
 
   // On mount: recover any in-progress extraction job from localStorage and resume polling
   useEffect(() => {
@@ -87,39 +115,33 @@ export default function OffersPage() {
     if (savedJobId) setActiveJobId(savedJobId);
   }, [idToken]);
 
+  // Initial load
   useEffect(() => {
     if (!idToken) return;
-    setLoadingOffers(true);
-    fetch("/api/admin/offers", {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setOffers(d.offers ?? []))
-      .finally(() => setLoadingOffers(false));
-  }, [idToken]);
+    fetchOffers(1, "initial");
+  }, [idToken, fetchOffers]);
 
-  const handleRefresh = useCallback(async () => {
-    if (!idToken || refreshing) return;
-    setRefreshing(true);
-    try {
-      const r = await fetch("/api/admin/offers", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      const d = await r.json();
-      setOffers(d.offers ?? []);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [idToken, refreshing]);
+  // Infinite scroll observer — set up once, reads current callback via ref
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMoreCallbackRef.current(); },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
-  function handleScrollToOffer(offerId: string) {
-    setShowAddModal(false);
-    setHighlightedOfferId(offerId);
-    setTimeout(() => {
-      document.getElementById(`offer-${offerId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 150);
-    setTimeout(() => setHighlightedOfferId(null), 4000);
-  }
+  // Keep loadMore callback fresh on every render without rebuilding the observer
+  loadMoreCallbackRef.current = () => {
+    if (hasMore && !loadingMore && !loadingOffers) fetchOffers(currentPage + 1, "more");
+  };
+
+  const handleRefresh = useCallback(() => {
+    if (refreshing || loadingOffers) return;
+    fetchOffers(1, "refresh");
+  }, [fetchOffers, refreshing, loadingOffers]);
 
   const dispatchedCount = offers.filter((o) => o.dispatched_at).length;
 
@@ -248,7 +270,7 @@ export default function OffersPage() {
 
         {loadingOffers ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="bg-white rounded-2xl border border-gray-100 h-72 animate-pulse" />
             ))}
           </div>
@@ -262,32 +284,44 @@ export default function OffersPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {displayedOffers.map((offer) => (
-              <div
-                key={offer.id}
-                id={`offer-${offer.id}`}
-                className={`rounded-2xl transition-all duration-700 ${
-                  highlightedOfferId === offer.id
-                    ? "ring-2 ring-amber-400 shadow-lg shadow-amber-100"
-                    : ""
-                }`}
-              >
-                <OfferCard
-                  offer={offer}
-                  idToken={idToken}
-                  onDispatched={(id) =>
-                    setOffers((prev) =>
-                      prev.map((o) =>
-                        o.id === id ? { ...o, dispatched_at: new Date().toISOString() } : o
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {displayedOffers.map((offer) => (
+                <div
+                  key={offer.id}
+                  id={`offer-${offer.id}`}
+                  className={`rounded-2xl transition-all duration-700 ${
+                    highlightedOfferId === offer.id
+                      ? "ring-2 ring-amber-400 shadow-lg shadow-amber-100"
+                      : ""
+                  }`}
+                >
+                  <OfferCard
+                    offer={offer}
+                    idToken={idToken}
+                    onDispatched={(id) =>
+                      setOffers((prev) =>
+                        prev.map((o) =>
+                          o.id === id ? { ...o, dispatched_at: new Date().toISOString() } : o
+                        )
                       )
-                    )
-                  }
-                />
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            {loadingMore && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl border border-gray-100 h-72 animate-pulse" />
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
+
+        {/* Scroll sentinel — triggers next page load */}
+        <div ref={sentinelRef} className="h-1" />
       </main>
 
       {showAddModal && idToken && (
