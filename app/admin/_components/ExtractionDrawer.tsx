@@ -252,15 +252,28 @@ export function ExtractionDrawer({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          key="extraction-drawer"
-          initial={{ x: DRAWER_WIDTH }}
-          animate={{ x: 0 }}
-          exit={{ x: DRAWER_WIDTH }}
-          transition={{ type: "spring", stiffness: 320, damping: 32 }}
-          style={{ width: DRAWER_WIDTH }}
-          className="fixed top-0 right-0 h-screen z-40 bg-white border-l border-gray-100 shadow-2xl flex flex-col"
-        >
+        <>
+          {/* Backdrop — darkens page content, closes on click */}
+          <motion.div
+            key="extraction-drawer-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30 bg-black/40 cursor-pointer"
+            onClick={onClose}
+          />
+
+          {/* Drawer panel */}
+          <motion.div
+            key="extraction-drawer"
+            initial={{ x: DRAWER_WIDTH }}
+            animate={{ x: 0 }}
+            exit={{ x: DRAWER_WIDTH }}
+            transition={{ type: "spring", stiffness: 320, damping: 32 }}
+            style={{ width: DRAWER_WIDTH }}
+            className="fixed top-0 right-0 h-screen z-40 bg-white border-l border-gray-100 shadow-2xl flex flex-col"
+          >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
             <div className="flex items-center gap-2.5">
@@ -357,7 +370,8 @@ export function ExtractionDrawer({
               </motion.div>
             )}
           </div>
-        </motion.div>
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
