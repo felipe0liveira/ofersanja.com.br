@@ -12,11 +12,13 @@ export function useOffers(idToken: string) {
   const [hasMore, setHasMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [extractionResult, setExtractionResult] = useState<{ done: true } | { error: string } | null>(null);
+  const [extractionResult, setExtractionResult] = useState<{ done: true } | null>(null);
+  const [errorJobDetails, setErrorJobDetails] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreCallbackRef = useRef<() => void>(() => {});
+  const lastStatusRef = useRef<string | null>(null);
 
   const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -29,8 +31,10 @@ export function useOffers(idToken: string) {
 
   const handleJobStarted = useCallback((jobId: string) => {
     setActiveJobId(jobId);
+    lastStatusRef.current = null;
     localStorage.setItem("activeJobId", jobId);
-  }, []);
+    addToast("info", "Processo de extração iniciado");
+  }, [addToast]);
 
   const fetchOffers = useCallback(
     async (page: number, mode: "initial" | "more" | "refresh") => {
@@ -68,24 +72,39 @@ export function useOffers(idToken: string) {
           if (res.status === 404) {
             clearInterval(interval);
             setActiveJobId(null);
+            lastStatusRef.current = null;
             localStorage.removeItem("activeJobId");
           }
           return;
         }
         const data = await res.json();
-        if (data.status === "success") {
+        const status: string = data.status;
+
+        // Fire toast only on status transitions
+        if (status !== lastStatusRef.current) {
+          lastStatusRef.current = status;
+          if (status === "extracting") {
+            addToast("info", "Acessando o produto no Mercado Livre...");
+          } else if (status === "converting_link") {
+            addToast("info", "Gerando link de afiliado...");
+          }
+        }
+
+        if (status === "success") {
           clearInterval(interval);
           setActiveJobId(null);
+          lastStatusRef.current = null;
           localStorage.removeItem("activeJobId");
           fetchOffers(1, "refresh");
           setExtractionResult({ done: true });
-          if (!showAddModalRef.current) addToast("success", "Extração finalizada com sucesso!");
-        } else if (data.status === "error") {
+          addToast("success", "Oferta salva com sucesso!");
+        } else if (status === "error") {
           clearInterval(interval);
           setActiveJobId(null);
+          lastStatusRef.current = null;
           localStorage.removeItem("activeJobId");
-          setExtractionResult({ error: data.details ?? "Falha ao extrair produto." });
-          if (!showAddModalRef.current) addToast("error", "Erro na extração.");
+          setErrorJobDetails(data.details ?? "Falha ao extrair produto.");
+          setExtractionResult(null);
         }
       } catch {
         // network hiccup — keep polling
@@ -141,6 +160,10 @@ export function useOffers(idToken: string) {
     setExtractionResult(null);
   }, []);
 
+  const clearErrorJobDetails = useCallback(() => {
+    setErrorJobDetails(null);
+  }, []);
+
   return {
     offers,
     loadingOffers,
@@ -149,6 +172,8 @@ export function useOffers(idToken: string) {
     activeJobId,
     extractionResult,
     clearExtractionResult,
+    errorJobDetails,
+    clearErrorJobDetails,
     toasts,
     sentinelRef,
     showAddModalRef,

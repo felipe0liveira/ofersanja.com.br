@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-import { X, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { X, CheckCircle2, AlertTriangle, XCircle, Info } from "lucide-react";
 
 export type Toast = {
   id: string;
-  type: "success" | "warning" | "error";
+  type: "success" | "warning" | "error" | "info";
   message: string;
 };
 
 const ICONS = {
-  success: <CheckCircle2 className="w-5 h-5 shrink-0 text-green-600" />,
-  warning: <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" />,
-  error: <XCircle className="w-5 h-5 shrink-0 text-red-500" />,
+  success: <CheckCircle2 className="w-4 h-4 shrink-0" />,
+  warning: <AlertTriangle className="w-4 h-4 shrink-0" />,
+  error: <XCircle className="w-4 h-4 shrink-0" />,
+  info: <Info className="w-4 h-4 shrink-0" />,
 };
 
 const STYLES = {
-  success: "border-green-400 bg-green-50 text-green-900",
-  warning: "border-amber-400 bg-amber-50 text-amber-900",
-  error: "border-red-400 bg-red-50 text-red-900",
+  success: "bg-emerald-600 text-white",
+  warning: "bg-amber-500 text-white",
+  error: "bg-red-600 text-white",
+  info: "bg-gray-900 text-white",
 };
 
-const AUTO_DISMISS_MS = 5000;
+const AUTO_DISMISS_MS = 4000;
 
 function ToastItem({
   toast,
@@ -37,16 +39,16 @@ function ToastItem({
 
   return (
     <div
-      className={`flex items-start gap-3 rounded-lg border-l-4 px-4 py-3 shadow-md min-w-64 max-w-sm animate-fade-in ${STYLES[toast.type]}`}
+      className={`flex items-center gap-2.5 rounded-full px-4 py-2.5 shadow-lg text-sm font-medium animate-fade-in ${STYLES[toast.type]}`}
     >
       {ICONS[toast.type]}
-      <span className="flex-1 text-sm font-medium leading-5">{toast.message}</span>
+      <span>{toast.message}</span>
       <button
         onClick={() => onDismiss(toast.id)}
         className="ml-1 opacity-60 hover:opacity-100 transition-opacity"
         aria-label="Fechar notificação"
       >
-        <X className="w-4 h-4" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -62,7 +64,7 @@ export function ToastStack({
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 items-end pointer-events-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastItem toast={toast} onDismiss={onDismiss} />

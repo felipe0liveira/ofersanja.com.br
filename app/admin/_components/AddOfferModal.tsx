@@ -14,7 +14,7 @@ export function AddOfferModal({
   idToken: string;
   onClose: () => void;
   onJobStarted: (jobId: string) => void;
-  extractionResult?: { done: true } | { error: string } | null;
+  extractionResult?: { done: true } | null;
 }) {
   const [step, setStep] = useState<Step>("input");
   const [url, setUrl] = useState("");
@@ -24,12 +24,7 @@ export function AddOfferModal({
   // React to extraction result coming from the parent (page-level polling)
   useEffect(() => {
     if (!extractionResult || step !== "extracting") return;
-    if ("done" in extractionResult) {
-      setStep("result");
-    } else {
-      setErrorMsg(extractionResult.error);
-      setStep("error");
-    }
+    setStep("result");
   }, [extractionResult, step]);
 
   async function handleSubmit(e: React.FormEvent) {

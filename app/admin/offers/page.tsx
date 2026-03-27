@@ -8,6 +8,7 @@ import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
 import { AddOfferModal } from "../_components/AddOfferModal";
 import { ToastStack } from "../_components/ToastStack";
+import { ExtractionErrorModal } from "../_components/ExtractionErrorModal";
 import type { Offer } from "@/lib/types/offer";
 
 type SortBy = "default" | "price_asc" | "price_desc" | "discount_desc" | "discount_asc";
@@ -22,6 +23,8 @@ export default function OffersPage() {
     activeJobId,
     extractionResult,
     clearExtractionResult,
+    errorJobDetails,
+    clearErrorJobDetails,
     toasts,
     sentinelRef,
     showAddModalRef,
@@ -224,6 +227,10 @@ export default function OffersPage() {
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      {errorJobDetails && (
+        <ExtractionErrorModal details={errorJobDetails} onClose={clearErrorJobDetails} />
+      )}
     </div>
   );
 }
