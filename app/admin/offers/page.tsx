@@ -222,7 +222,6 @@ export default function OffersPage() {
           idToken={idToken}
           onClose={() => setShowAddModal(false)}
           onJobStarted={handleJobStarted}
-          extractionResult={extractionResult}
         />
       )}
 
