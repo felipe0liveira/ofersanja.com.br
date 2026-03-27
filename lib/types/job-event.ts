@@ -8,7 +8,10 @@ export type JobEventType =
   | "affiliate_link_completed"
   | "offer_saved"
   | "offer_save_failed"
-  | "completed";
+  | "completed"
+  | "short_link_resolve_started"
+  | "short_link_resolve_completed"
+  | "short_link_resolve_failed";
 
 export type JobEvent = {
   id: string;

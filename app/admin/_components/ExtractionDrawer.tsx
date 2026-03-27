@@ -80,6 +80,21 @@ const EVENT_META: Record<JobEventType, EventMeta> = {
     icon: <CheckCheck className="w-3.5 h-3.5" />,
     color: "text-emerald-600",
   },
+  short_link_resolve_started: {
+    label: "Resolvendo link encurtado",
+    icon: <Link2 className="w-3.5 h-3.5" />,
+    color: "text-blue-500",
+  },
+  short_link_resolve_completed: {
+    label: "Link encurtado resolvido",
+    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+    color: "text-emerald-500",
+  },
+  short_link_resolve_failed: {
+    label: "Falha ao resolver link encurtado",
+    icon: <XCircle className="w-3.5 h-3.5" />,
+    color: "text-red-500",
+  },
 };
 
 // ── Status label/color ────────────────────────────────────────────────────────
