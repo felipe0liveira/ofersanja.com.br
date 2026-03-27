@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Toast } from "../_components/ToastStack";
 import type { Offer } from "@/lib/types/offer";
+import type { JobEvent } from "@/lib/types/job-event";
 
 export function useOffers(idToken: string) {
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -12,13 +13,14 @@ export function useOffers(idToken: string) {
   const [hasMore, setHasMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [extractionResult, setExtractionResult] = useState<{ done: true } | null>(null);
-  const [errorJobDetails, setErrorJobDetails] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const [jobEvents, setJobEvents] = useState<JobEvent[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const showAddModalRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreCallbackRef = useRef<() => void>(() => {});
   const lastStatusRef = useRef<string | null>(null);
+  const seenEventIdsRef = useRef<Set<string>>(new Set());
 
   const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -31,6 +33,9 @@ export function useOffers(idToken: string) {
 
   const handleJobStarted = useCallback((jobId: string) => {
     setActiveJobId(jobId);
+    setJobStatus(null);
+    setJobEvents([]);
+    seenEventIdsRef.current = new Set();
     lastStatusRef.current = null;
     localStorage.setItem("activeJobId", jobId);
     addToast("info", "Processo de extração iniciado");
@@ -60,7 +65,7 @@ export function useOffers(idToken: string) {
     [idToken]
   );
 
-  // Page-level polling — continues even when the modal is closed
+  // Status polling
   useEffect(() => {
     if (!activeJobId || !idToken) return;
     const interval = setInterval(async () => {
@@ -72,6 +77,7 @@ export function useOffers(idToken: string) {
           if (res.status === 404) {
             clearInterval(interval);
             setActiveJobId(null);
+            setJobStatus(null);
             lastStatusRef.current = null;
             localStorage.removeItem("activeJobId");
           }
@@ -79,15 +85,10 @@ export function useOffers(idToken: string) {
         }
         const data = await res.json();
         const status: string = data.status;
+        setJobStatus(status);
 
-        // Fire toast only on status transitions
         if (status !== lastStatusRef.current) {
           lastStatusRef.current = status;
-          if (status === "extracting") {
-            addToast("info", "Acessando o produto no Mercado Livre...");
-          } else if (status === "converting_link") {
-            addToast("info", "Gerando link de afiliado...");
-          }
         }
 
         if (status === "success") {
@@ -96,22 +97,47 @@ export function useOffers(idToken: string) {
           lastStatusRef.current = null;
           localStorage.removeItem("activeJobId");
           fetchOffers(1, "refresh");
-          setExtractionResult({ done: true });
           addToast("success", "Oferta salva com sucesso!");
         } else if (status === "error") {
           clearInterval(interval);
           setActiveJobId(null);
           lastStatusRef.current = null;
           localStorage.removeItem("activeJobId");
-          setErrorJobDetails(data.details ?? "Falha ao extrair produto.");
-          setExtractionResult(null);
         }
       } catch {
         // network hiccup — keep polling
       }
-    }, 5_000);
+    }, 4_000);
     return () => clearInterval(interval);
   }, [activeJobId, idToken, fetchOffers, addToast]);
+
+  // Events polling — appends only new events using seen-ids dedup
+  useEffect(() => {
+    if (!activeJobId || !idToken) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/jobs/${activeJobId}/events`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) return;
+        const data: JobEvent[] = await res.json();
+        const newEvents = data.filter((e) => !seenEventIdsRef.current.has(e.id));
+        if (newEvents.length > 0) {
+          newEvents.forEach((e) => seenEventIdsRef.current.add(e.id));
+          setJobEvents((prev) => {
+            const merged = [...prev, ...newEvents];
+            merged.sort((a, b) =>
+              new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
+            );
+            return merged;
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }, 3_000);
+    return () => clearInterval(interval);
+  }, [activeJobId, idToken]);
 
   // Recover any in-progress extraction job from localStorage on mount
   useEffect(() => {
@@ -156,24 +182,14 @@ export function useOffers(idToken: string) {
     );
   }, []);
 
-  const clearExtractionResult = useCallback(() => {
-    setExtractionResult(null);
-  }, []);
-
-  const clearErrorJobDetails = useCallback(() => {
-    setErrorJobDetails(null);
-  }, []);
-
   return {
     offers,
     loadingOffers,
     loadingMore,
     refreshing,
     activeJobId,
-    extractionResult,
-    clearExtractionResult,
-    errorJobDetails,
-    clearErrorJobDetails,
+    jobStatus,
+    jobEvents,
     toasts,
     sentinelRef,
     showAddModalRef,
@@ -183,3 +199,4 @@ export function useOffers(idToken: string) {
     markOfferDispatched,
   };
 }
+

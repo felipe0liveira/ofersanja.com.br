@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, ShoppingBag, Loader2, RefreshCw, ArrowUpDown } from "lucide-react";
+import { motion } from "framer-motion";
+import { Plus, ShoppingBag, Loader2, RefreshCw, ArrowUpDown, PanelRightOpen } from "lucide-react";
 import { useAdminAuth } from "../_hooks/useAdminAuth";
 import { useOffers } from "../_hooks/useOffers";
 import { AdminHeader } from "../_components/AdminHeader";
 import { OfferCard } from "../_components/OfferCard";
 import { AddOfferModal } from "../_components/AddOfferModal";
 import { ToastStack } from "../_components/ToastStack";
-import { ExtractionErrorModal } from "../_components/ExtractionErrorModal";
+import { ExtractionDrawer, DRAWER_WIDTH } from "../_components/ExtractionDrawer";
 import type { Offer } from "@/lib/types/offer";
 
 type SortBy = "default" | "price_asc" | "price_desc" | "discount_desc" | "discount_asc";
@@ -21,10 +22,8 @@ export default function OffersPage() {
     loadingMore,
     refreshing,
     activeJobId,
-    extractionResult,
-    clearExtractionResult,
-    errorJobDetails,
-    clearErrorJobDetails,
+    jobStatus,
+    jobEvents,
     toasts,
     sentinelRef,
     showAddModalRef,
@@ -37,6 +36,7 @@ export default function OffersPage() {
   const [sortBy, setSortBy] = useState<SortBy>("default");
   const [showDispatched, setShowDispatched] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
   const [highlightedOfferId, setHighlightedOfferId] = useState<string | null>(null);
 
   // Let the hook's polling effect know whether the modal is open
@@ -71,7 +71,13 @@ export default function OffersPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col overflow-x-hidden">
+      {/* Content area that shifts left when drawer is open */}
+      <motion.div
+        className="flex flex-col flex-1 min-h-screen"
+        animate={{ marginRight: showDrawer ? DRAWER_WIDTH : 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 32 }}
+      >
       <AdminHeader user={user!} roles={roles} />
 
       {/* Sub-navbar */}
@@ -102,13 +108,15 @@ export default function OffersPage() {
 
             <button
               onClick={() => {
-                clearExtractionResult();
-                setShowAddModal(true);
+                if (activeJobId) {
+                  setShowDrawer(true);
+                } else {
+                  setShowAddModal(true);
+                }
               }}
-              disabled={!!activeJobId}
               className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 activeJobId
-                  ? "bg-blue-900 text-white opacity-80 cursor-not-allowed"
+                  ? "bg-blue-900 text-white hover:bg-blue-800"
                   : "bg-blue-950 hover:bg-blue-900 text-white"
               }`}
             >
@@ -116,6 +124,7 @@ export default function OffersPage() {
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="hidden sm:inline">Extraindo...</span>
+                  <PanelRightOpen className="w-4 h-4 ml-0.5 opacity-70" />
                 </>
               ) : (
                 <>
@@ -221,15 +230,26 @@ export default function OffersPage() {
         <AddOfferModal
           idToken={idToken}
           onClose={() => setShowAddModal(false)}
-          onJobStarted={handleJobStarted}
+          onJobStarted={(jobId) => {
+            handleJobStarted(jobId);
+            setShowDrawer(true);
+          }}
         />
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
-      {errorJobDetails && (
-        <ExtractionErrorModal details={errorJobDetails} onClose={clearErrorJobDetails} />
-      )}
+      </motion.div>
+
+      {/* Extraction drawer — fixed, outside push layout */}
+      <ExtractionDrawer
+        isOpen={showDrawer}
+        idToken={idToken ?? ""}
+        activeJobId={activeJobId}
+        jobStatus={jobStatus}
+        jobEvents={jobEvents}
+        onClose={() => setShowDrawer(false)}
+      />
     </div>
   );
 }
