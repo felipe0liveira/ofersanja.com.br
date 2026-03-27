@@ -75,11 +75,13 @@ export function JobErrorModal({
                   Carregando captura de tela...
                 </div>
               ) : screenshotUrl ? (
-                <img
-                  src={screenshotUrl}
-                  alt="Captura de tela do erro"
-                  className="w-full object-contain"
-                />
+                <div className="max-h-96 overflow-y-auto">
+                  <img
+                    src={screenshotUrl}
+                    alt="Captura de tela do erro"
+                    className="w-full object-contain"
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
                   Captura não disponível
