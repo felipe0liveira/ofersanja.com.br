@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
+import { getBackendToken } from "@/lib/get-backend-token";
 
 const BACKEND_API_URL = process.env.BACKEND_API_URL!;
 
@@ -17,7 +18,11 @@ export async function GET(request: NextRequest) {
   if (searchParams.has("limit")) backendUrl.searchParams.set("limit", searchParams.get("limit")!);
 
   try {
-    const res = await fetch(backendUrl.toString(), { cache: "no-store" });
+    const token = await getBackendToken(BACKEND_API_URL);
+    const res = await fetch(backendUrl.toString(), {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) {
       return Response.json({ error: "Backend error" }, { status: 502 });
     }

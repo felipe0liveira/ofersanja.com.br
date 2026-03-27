@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
+import { getBackendToken } from "@/lib/get-backend-token";
 
 const BACKEND_API_URL = process.env.BACKEND_API_URL!;
 
@@ -13,7 +14,11 @@ export async function GET(
   const { id: jobId } = await params;
 
   try {
-    const res = await fetch(`${BACKEND_API_URL}/jobs/${jobId}`, { cache: "no-store" });
+    const token = await getBackendToken(BACKEND_API_URL);
+    const res = await fetch(`${BACKEND_API_URL}/jobs/${jobId}`, {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (res.status === 404) {
       return Response.json({ error: "Job not found" }, { status: 404 });
     }

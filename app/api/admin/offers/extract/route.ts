@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { verifyBffToken } from "@/lib/verify-bff-token";
+import { getBackendToken } from "@/lib/get-backend-token";
 
 const BACKEND_API_URL = process.env.BACKEND_API_URL!;
 
@@ -17,9 +18,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const token = await getBackendToken(BACKEND_API_URL);
     const res = await fetch(`${BACKEND_API_URL}/offers/extract`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ url }),
     });
     const data = await res.json();
