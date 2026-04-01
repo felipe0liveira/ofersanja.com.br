@@ -10,3 +10,12 @@ button,
 a {
   cursor: pointer;
 }
+
+/* Prevent auto-zoom on input focus on iOS Safari (requires font-size >= 16px) */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
